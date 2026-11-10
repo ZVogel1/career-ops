@@ -1,0 +1,17 @@
+# Render free-tier deploy for tools/ats-site (career-ops ATS scanner).
+# Personal data (cv.md, tracker, output/) is NOT in git and NOT deployed —
+# resumes/JDs live in the Neon database library instead.
+services:
+  - type: web
+    name: career-ops-ats
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node tools/ats-site/server.mjs
+    envVars:
+      - key: HOST
+        value: 0.0.0.0 # server binds localhost-only unless told otherwise
+      - key: DATABASE_URL
+        sync: false # set in Render dashboard (Neon connection string)
+      - key: SITE_PASSWORD
+        sync: false # set in Render dashboard (login password for the site)
