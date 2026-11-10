@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
+	"github.com/santifer/career-ops/dashboard/internal/data"
 	"github.com/santifer/career-ops/dashboard/internal/model"
 	"github.com/santifer/career-ops/dashboard/internal/theme"
 )
@@ -115,6 +117,30 @@ func TestRenderAppLineIncludesDateColumn(t *testing.T) {
 	}
 	if !strings.Contains(line, "#42") {
 		t.Fatalf("expected rendered line to include tracker number marker, got %q", line)
+	}
+
+	// With ledger history the DATE column shows the latest status change,
+	// not the tracker's evaluation date.
+	line = pm.renderAppLine(model.CareerApplication{
+		Number:     42,
+		Date:       "2026-04-13",
+		StatusDate: "2026-05-20",
+		Company:    "Anthropic",
+		Role:       "Forward Deployed Engineer",
+		Status:     "Interview",
+		Score:      4.5,
+		HasScore:   true,
+	}, false)
+	if !strings.Contains(line, "2026-05-20") || strings.Contains(line, "2026-04-13") {
+		t.Fatalf("expected DATE column to show the status-change date over the tracker date, got %q", line)
+	}
+}
+
+func TestColumnHeaderReadsDate(t *testing.T) {
+	pm := NewPipelineModel(theme.NewTheme("catppuccin-mocha"), nil, model.PipelineMetrics{}, "..", 120, 40)
+	header := pm.renderColumnHeader()
+	if !strings.Contains(header, "DATE") || strings.Contains(header, "APPLIED") {
+		t.Fatalf("expected the date column header to read DATE, not APPLIED, got %q", header)
 	}
 }
 
@@ -454,6 +480,27 @@ func TestRespondedTabSitsBetweenInterviewAndApplied(t *testing.T) {
 	}
 }
 
+func TestAssessmentTabFiltersCorrectly(t *testing.T) {
+	apps := []model.CareerApplication{
+		{Company: "AirAsia", Role: "Data Engineer", Status: "Assessment"},
+		{Company: "AirAsia", Role: "Data Engineer", Status: "Interview"},
+	}
+	pm := NewPipelineModel(
+		theme.NewTheme("catppuccin-mocha"),
+		apps,
+		model.PipelineMetrics{Total: len(apps)},
+		t.TempDir(),
+		120,
+		40,
+	)
+
+	pm.activeTab = tabIndexForFilter(t, filterAssessment)
+	pm.applyFilterAndSort()
+	if len(pm.filtered) != 1 || data.NormalizeStatus(pm.filtered[0].Status) != "assessment" {
+		t.Fatalf("expected assessment tab to isolate assessment rows, got %+v", pm.filtered)
+	}
+}
+
 // Regression: with no committed search query, Esc must NOT close the screen.
 // The help bar advertises only `q quit`, so Esc quitting silently was a bug
 // that surfaced as accidental exits when users hit Esc to "back out" of the UI.
@@ -546,6 +593,55 @@ func previewModelWith(t *testing.T, app model.CareerApplication) PipelineModel {
 	pm.applyFilterAndSort()
 	pm.cursor = 0
 	return pm
+}
+
+// TestPreviewTruncatesTldrToTerminalCells verifies visible truncation across terminal widths and wide runes.
+// @param t The Go test context.
+// @returns No value.
+func TestPreviewTruncatesTldrToTerminalCells(t *testing.T) {
+	tests := []struct {
+		name       string
+		width      int
+		tldr       string
+		wantSuffix string
+	}{
+		{name: "latin at 80 columns", width: 80, tldr: strings.Repeat("a", 120), wantSuffix: "..."},
+		{name: "latin at 120 columns", width: 120, tldr: strings.Repeat("a", 120), wantSuffix: "..."},
+		{name: "latin at 160 columns", width: 160, tldr: strings.Repeat("a", 120), wantSuffix: strings.Repeat("a", 120)},
+		{name: "wide runes at 80 columns", width: 80, tldr: strings.Repeat("界", 117) + "...", wantSuffix: "..."},
+		{name: "wide runes at 120 columns", width: 120, tldr: strings.Repeat("界", 117) + "...", wantSuffix: "..."},
+		{name: "wide runes at 160 columns", width: 160, tldr: strings.Repeat("界", 117) + "...", wantSuffix: "..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := model.CareerApplication{
+				Company:    "Acme",
+				Role:       "Agent Engineer",
+				ReportPath: "reports/001-acme.md",
+			}
+			pm := previewModelWith(t, app)
+			pm.width = tt.width
+			pm.reportCache[app.ReportPath] = reportSummary{tldr: tt.tldr}
+
+			var tldrLine string
+			for _, line := range strings.Split(ansi.Strip(pm.renderPreview()), "\n") {
+				if strings.Contains(line, "TL;DR: ") {
+					tldrLine = line
+					break
+				}
+			}
+			if tldrLine == "" {
+				t.Fatal("expected preview to include the cached TL;DR")
+			}
+			if got := ansi.StringWidth(tldrLine); got > tt.width {
+				t.Fatalf("TL;DR line is %d cells, wider than terminal width %d: %q", got, tt.width, tldrLine)
+			}
+			if !strings.HasSuffix(strings.TrimRight(tldrLine, " "), tt.wantSuffix) {
+				t.Fatalf("TL;DR line should end with %q, got %q", tt.wantSuffix, tldrLine)
+			}
+		})
+	}
 }
 
 func TestPreviewKeepsDiscardReasonWhenTlDrIsCached(t *testing.T) {
