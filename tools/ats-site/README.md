@@ -28,26 +28,42 @@ has to be on when you use it). To open it to *your own* Wi-Fi devices only
 Optional local password + Neon: copy `.env.example` values into `tools/ats-site/.env`
 (`SITE_PASSWORD=...`, `DATABASE_URL=postgres://...`) or export them in the shell.
 
-## Host it free (Render + Neon) — always-on public URL
+## Host it free (Render + Neon) — always-on + CI/CD
 
 Personal files (`cv.md`, tracker, `output/`) are **not in git and never deployed** —
 hosted resumes/JDs live in the Neon **Library** instead. Only code deploys.
+Local state (`tools/ats-site/.env`, `local-data.json`) stays gitignored.
 
-1. **Neon (database, free):** sign up at neon.tech → New Project → copy the
-   **connection string** (`postgres://user:pass@ep-....aws.neon.tech/db?sslmode=require`).
-   Free tier: 0.5 GB, scales to zero when idle, no card.
-2. **Push the code:** in this repo —
-   `git add tools/ats-site render.yaml .gitignore && git commit -m "ats-site" && git push`
-3. **Render (host, free):** sign up at render.com → New → **Blueprint** → pick
-   `ZVogel1/career-ops` → it reads `render.yaml`. When prompted, set:
-   - `DATABASE_URL` = the Neon connection string from step 1
-   - `SITE_PASSWORD` = a password you'll use to sign in
-4. Open the `*.onrender.com` URL, sign in, and seed your library: paste your resume
-   (Library → Resume → save), paste JDs as you evaluate them. Scans, history, and
-   notifications persist in Neon from there.
+### One-time setup
 
-Free-tier reality: Render free services **sleep after ~15 min idle** and take
-~30–60 s to wake on the next visit. Neon wakes in ~1 s. $0 total.
+1. **Neon (database, free):** neon.tech → New Project → copy the
+   **connection string** (`postgres://…?sslmode=require`).
+2. **Commit & push MatchScan** (from repo root):
+   ```bash
+   git add tools/ats-site render.yaml .github/workflows/matchscan-ci.yml .gitignore
+   git commit -m "feat: MatchScan + Render CI/CD"
+   git push origin main
+   ```
+3. **Render (host, free):** render.com → New → **Blueprint** → `ZVogel1/career-ops`
+   → reads `render.yaml` (`autoDeploy: true`, health check `/api/health`). Set:
+   - `DATABASE_URL` = Neon connection string
+   - `SITE_PASSWORD` = login password
+4. **Optional deploy hook (GitHub Actions CD):** Render → service →
+   **Settings → Deploy Hook** → copy URL → GitHub
+   **Settings → Secrets → Actions** → `RENDER_DEPLOY_HOOK`. Pushes that change
+   MatchScan run `.github/workflows/matchscan-ci.yml` then trigger Render.
+   Blueprint autoDeploy alone is enough if you skip the secret.
+5. Open the `*.onrender.com` URL, sign in, seed Library (paste resume / JDs).
+
+### What runs on every push / PR
+
+| Job | When | Does |
+|-----|------|------|
+| MatchScan syntax + smoke | PR/push touching `tools/ats-site/**`, `render.yaml` | `node --check`, refuse tracked secrets, boot + `/api/health` |
+| Deploy to Render | push `main` or manual **Run workflow** | POST deploy hook if `RENDER_DEPLOY_HOOK` is set |
+
+Free-tier reality: Render **sleeps after ~15 min idle**; wake ~30–60 s. Neon ~1 s. $0.
+Hosted `JOBS_AUTO_REFRESH=0` (no portal scan on the dyno).
 
 ## Features
 

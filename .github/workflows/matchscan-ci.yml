@@ -1,0 +1,87 @@
+name: MatchScan CI/CD
+
+# Validates tools/ats-site on every change. Deploys to Render when
+# RENDER_DEPLOY_HOOK is set as a repo secret (Settings → Secrets → Actions).
+# Render Blueprint autoDeploy also redeploys on push when the service is linked.
+on:
+  pull_request:
+    paths:
+      - 'tools/ats-site/**'
+      - 'render.yaml'
+      - 'keyword-match.mjs'
+      - '.github/workflows/matchscan-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ats-site/**'
+      - 'render.yaml'
+      - 'keyword-match.mjs'
+      - '.github/workflows/matchscan-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: MatchScan syntax + smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Syntax-check MatchScan server
+        run: node --check tools/ats-site/server.mjs
+      - name: Refuse committing local secrets / state
+        run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch tools/ats-site/.env 2>/dev/null; then
+            echo "::error::tools/ats-site/.env must not be tracked"
+            exit 1
+          fi
+          if git ls-files --error-unmatch tools/ats-site/local-data.json 2>/dev/null; then
+            echo "::error::tools/ats-site/local-data.json must not be tracked"
+            exit 1
+          fi
+          echo "OK: local state stays gitignored"
+      - name: Smoke-boot server + /api/health
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --omit=dev
+          HOST=127.0.0.1 PORT=4317 JOBS_AUTO_REFRESH=0 node tools/ats-site/server.mjs &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4317/api/health | grep -q '"ok":true'; then
+              echo "health ok"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::MatchScan did not become healthy"
+          exit 1
+
+  deploy:
+    name: Deploy to Render
+    needs: check
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_DEPLOY_HOOK:-}" ]; then
+            echo "RENDER_DEPLOY_HOOK not set — skipping deploy."
+            echo "Add it under repo Settings → Secrets and variables → Actions"
+            echo "(Render → Service → Settings → Deploy Hook), or rely on Blueprint autoDeploy."
+            exit 0
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+          echo "Render deploy triggered."

@@ -1,17 +1,30 @@
-# Render free-tier deploy for tools/ats-site (career-ops ATS scanner).
+# MatchScan (tools/ats-site) — Render free-tier Blueprint.
 # Personal data (cv.md, tracker, output/) is NOT in git and NOT deployed —
-# resumes/JDs live in the Neon database library instead.
+# resumes/JDs live in the Neon Library instead. Only code deploys.
+#
+# CI/CD: connect this repo in Render → Blueprint. Pushes to `main` that touch
+# the service auto-deploy. Optional: GitHub Actions deploy hook
+# (.github/workflows/matchscan-ci.yml) via RENDER_DEPLOY_HOOK secret.
 services:
   - type: web
     name: career-ops-ats
     runtime: node
     plan: free
-    buildCommand: "true"
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/health
+    buildCommand: "npm install --omit=dev"
     startCommand: node tools/ats-site/server.mjs
     envVars:
       - key: HOST
-        value: 0.0.0.0 # server binds localhost-only unless told otherwise
+        value: "0.0.0.0"
+      - key: NODE_VERSION
+        value: "22"
+      # Hosted box has no portals.yml / scan history — don't burn the dyno on scan.mjs.
+      - key: JOBS_AUTO_REFRESH
+        value: "0"
       - key: DATABASE_URL
         sync: false # set in Render dashboard (Neon connection string)
       - key: SITE_PASSWORD
-        sync: false # set in Render dashboard (login password for the site)
+        sync: false # set in Render dashboard (login password)

@@ -746,6 +746,9 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(INDEX);
     }
+    if (req.method === 'GET' && url.pathname === '/api/health') {
+      return json(res, 200, { ok: true, service: 'matchscan', storage: DB_URL ? 'neon' : 'local-file' });
+    }
     if (req.method === 'GET' && url.pathname === '/api/auth-status') {
       return json(res, 200, { required: !!PASSWORD, authed: isAuthed(req), storage: DB_URL ? 'neon' : 'local-file' });
     }
