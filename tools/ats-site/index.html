@@ -6,7 +6,7 @@
 <title>MatchScan — free ATS resume matcher</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg:#f4f7f6; --panel:#ffffff; --panel2:#f7faf9; --line:#dce6e2;
@@ -14,10 +14,12 @@
     --green:#1f8a5b; --green-deep:#146644; --green-soft:#e7f5ee; --green-mid:#b7dfc8;
     --amber:#c47a12; --red:#d64545; --ink:#10231c;
     --radius:7px; --radius-sm:5px; --shadow:0 4px 18px rgba(16,35,28,.06);
+    --font-pixel:"Jersey 10",system-ui,sans-serif;
+    --font-body:"Source Sans 3",system-ui,sans-serif;
   }
   * { box-sizing:border-box; }
   body {
-    margin:0; font:14.5px/1.5 "Source Sans 3",system-ui,sans-serif; color:var(--text);
+    margin:0; font:14.5px/1.5 var(--font-body); color:var(--text);
     background:var(--bg); min-height:100vh;
   }
   .app { display:grid; grid-template-columns:220px 1fr; min-height:100vh; }
@@ -27,13 +29,14 @@
     display:flex; flex-direction:column; gap:6px;
   }
   .brand {
-    font-size:22px; font-weight:800; color:var(--ink); letter-spacing:-.02em;
-    padding:4px 10px 16px; margin:0;
+    font-family:var(--font-pixel); font-size:28px; font-weight:400; color:var(--ink);
+    letter-spacing:.02em; padding:4px 10px 16px; margin:0; line-height:1.1;
   }
   .brand span { color:var(--green); }
   .nav-new {
     width:100%; background:var(--green); color:#fff; border:0; border-radius:var(--radius-sm);
-    padding:11px 14px; font:inherit; font-weight:700; cursor:pointer; margin-bottom:10px;
+    padding:11px 14px; font-family:var(--font-pixel); font-size:20px; font-weight:400;
+    cursor:pointer; margin-bottom:10px; line-height:1.1;
   }
   .nav-new:hover { background:var(--green-deep); }
   .tbtn, .nav-item {
@@ -49,16 +52,18 @@
   }
   .workspace { padding:22px 28px 48px; max-width:1100px; }
   .welcome h1 {
-    font-size:28px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em; color:var(--ink);
+    font-family:var(--font-pixel); font-size:36px; font-weight:400; margin:0 0 6px;
+    letter-spacing:.02em; color:var(--ink); line-height:1.05;
   }
-  .sub, .note, .quiet { color:var(--quiet); font-size:13.5px; font-weight:400; }
+  .sub, .note, .quiet { color:var(--quiet); font-size:13.5px; font-weight:400; font-family:var(--font-body); }
   .sub { margin:0 0 18px; max-width:620px; }
   .hero-scan {
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
     padding:20px 20px 16px; box-shadow:var(--shadow);
   }
   .hero-scan > h2 {
-    font-size:20px; font-weight:800; margin:0 0 4px; color:var(--ink); letter-spacing:-.01em;
+    font-family:var(--font-pixel); font-size:28px; font-weight:400; margin:0 0 4px;
+    color:var(--ink); letter-spacing:.02em; line-height:1.05;
   }
   .step {
     display:inline-flex; align-items:center; justify-content:center;
@@ -77,8 +82,8 @@
     padding:14px 16px; box-shadow:var(--shadow);
   }
   .card h2, .section-title {
-    font-size:16px; font-weight:800; letter-spacing:-.01em; color:var(--ink); margin:0 0 8px;
-    text-transform:none;
+    font-family:var(--font-pixel); font-size:22px; font-weight:400; letter-spacing:.02em;
+    color:var(--ink); margin:0 0 8px; text-transform:none; line-height:1.1;
   }
   .lbl { color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.02em; margin:0 0 6px; }
   select, textarea, input[type=text], input[type=password] {
@@ -92,7 +97,8 @@
   textarea.small { height:140px; }
   button.primary {
     background:var(--green); color:#fff; border:0; border-radius:var(--radius-sm);
-    padding:11px 20px; font-size:15px; font-weight:700; cursor:pointer;
+    padding:11px 20px; font-family:var(--font-pixel); font-size:20px; font-weight:400;
+    cursor:pointer; line-height:1.1;
   }
   button.primary:hover { background:var(--green-deep); }
   button.mini {
@@ -105,7 +111,7 @@
   @media (max-width:900px){ .report-layout{ grid-template-columns:1fr; } }
   .match-hero { text-align:center; position:sticky; top:16px; }
   .ring { width:150px; height:150px; margin:8px auto; }
-  .big { font-size:40px; font-weight:800; letter-spacing:-.03em; color:var(--ink); }
+  .big { font-family:var(--font-pixel); font-size:48px; font-weight:400; letter-spacing:.02em; color:var(--ink); line-height:1; }
   .match-verdict { font-weight:700; margin-top:4px; }
   .match-scale { display:flex; justify-content:space-between; font-size:11px; color:var(--quiet); margin:10px 2px 0; }
   .match-scale-bar {
@@ -172,6 +178,34 @@
   #catStrip { display:none !important; }
   .topbar-mobile { display:none; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
   @media (max-width:900px){ .topbar-mobile{ display:flex; } }
+  .lib-layout { display:grid; grid-template-columns:280px 1fr; gap:14px; min-height:480px; }
+  @media (max-width:900px){ .lib-layout{ grid-template-columns:1fr; } }
+  .lib-sidebar { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel2); display:flex; flex-direction:column; min-height:420px; }
+  .lib-filters { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--line); }
+  .lib-list { overflow:auto; flex:1; max-height:420px; }
+  .lib-item {
+    width:100%; text-align:left; border:0; border-bottom:1px solid var(--line); background:transparent;
+    padding:10px 12px; cursor:pointer; font:inherit; color:var(--text);
+  }
+  .lib-item:hover { background:#fff; }
+  .lib-item.active { background:var(--green-soft); color:var(--green-deep); }
+  .lib-item .lib-kind { font-size:11px; color:var(--quiet); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .lib-item .lib-name { font-weight:700; font-size:13.5px; margin-top:2px; }
+  .lib-preview {
+    border:1px solid var(--line); border-radius:var(--radius); background:#fff;
+    display:flex; flex-direction:column; min-height:420px; overflow:hidden;
+  }
+  .lib-preview-bar {
+    display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:10px 12px; border-bottom:1px solid var(--line); background:var(--panel2);
+  }
+  .lib-preview-bar h3 { margin:0; font-family:var(--font-pixel); font-size:20px; font-weight:400; color:var(--ink); }
+  #libPreviewFrame { width:100%; flex:1; min-height:360px; border:0; background:#fff; }
+  #libPreviewText {
+    flex:1; margin:0; padding:14px; overflow:auto; white-space:pre-wrap; font:12.5px/1.45 ui-monospace,Menlo,monospace;
+    color:var(--text); min-height:360px;
+  }
+  .jobs-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 </style>
 </head>
 <body>
@@ -209,7 +243,18 @@
 
   <div class="welcome" id="welcomeBlock">
     <h1>Welcome back</h1>
-    <p class="sub">Drop in your resume and a job description to get your Match Rate in about 30 seconds. Target 75%+ — never invent keywords. <span id="storeInfoInline"></span></p>
+    <p class="sub">Drop in your resume and a job description to get your Match Rate in about 30 seconds. Target 75%+ — never invent keywords.</p>
+  </div>
+
+  <div class="card" id="nextStepsCard" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+      <div>
+        <h2 style="margin:0">Next steps</h2>
+        <p class="note" id="nextStepsMeta" style="margin:4px 0 0">From your apply board</p>
+      </div>
+      <button class="primary" type="button" id="nextStepsRefreshBtn" style="padding:8px 14px;font-size:16px">Refresh</button>
+    </div>
+    <div id="nextStepsBody" style="margin-top:12px"><span class="note">Loading…</span></div>
   </div>
 
   <div class="dash-row" id="dashCards">
@@ -250,9 +295,12 @@
         <h2 style="margin:0">AI Job Match</h2>
         <p class="note" id="jobsMeta" style="margin:4px 0 0"></p>
       </div>
-      <button class="primary" id="jobsRefreshBtn" style="padding:9px 16px;font-size:13.5px">Search</button>
+      <div class="jobs-actions">
+        <button class="mini" type="button" id="jobsReloadBtn">Reload list</button>
+        <button class="primary" type="button" id="jobsRefreshBtn" style="padding:9px 16px;font-size:18px">Refresh jobs</button>
+      </div>
     </div>
-    <p class="note" id="jobsRefreshStatus" style="margin:8px 0 12px">Auto-scans portals every 6 hours while this site is running.</p>
+    <p class="note" id="jobsRefreshStatus" style="margin:8px 0 12px">Reload list pulls the latest dump. Refresh jobs runs a portal scan (can take a few minutes).</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <button class="fchip active" data-f="all">All</button>
       <button class="fchip" data-f="apply-ready">Apply-ready</button>
@@ -274,16 +322,50 @@
   </div>
 
   <div class="card" id="libraryPanel" style="display:none">
-    <h2>Resume Manager</h2>
-    <p class="note">Save resumes and JDs to your library (local or Neon).</p>
-    <div class="row">
-      <select id="libKind"><option value="resume">Resume</option><option value="jd">Job description</option></select>
-      <input type="text" id="libLabel" placeholder="Label, e.g. Bloomerang resume">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <div>
+        <h2 style="margin:0">Resume Manager</h2>
+        <p class="note" style="margin:4px 0 0">Browse tailored resumes &amp; CVs, preview them, or save new ones to your library.</p>
+      </div>
+      <button class="mini" type="button" id="libRefreshBtn">Refresh list</button>
     </div>
-    <div style="height:8px"></div>
-    <textarea class="small" id="libContent" placeholder="Paste the document text."></textarea>
-    <div style="height:8px"></div>
-    <button class="primary" id="libSave">Save</button> <span class="note" id="libStatus"></span>
+    <div class="lib-layout">
+      <div class="lib-sidebar">
+        <div class="lib-filters">
+          <button class="fchip active" type="button" data-libf="all">All</button>
+          <button class="fchip" type="button" data-libf="resume">Resumes</button>
+          <button class="fchip" type="button" data-libf="cv">CVs</button>
+          <button class="fchip" type="button" data-libf="master">Master</button>
+          <button class="fchip" type="button" data-libf="library">Library</button>
+        </div>
+        <div class="lib-list" id="libList"><span class="note" style="padding:12px;display:block">Loading…</span></div>
+      </div>
+      <div class="lib-preview">
+        <div class="lib-preview-bar">
+          <h3 id="libPreviewTitle">Select a document</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="mini" type="button" id="libUseScanBtn" disabled>Use in New Scan</button>
+            <button class="primary" type="button" id="libScanNowBtn" disabled style="padding:8px 14px;font-size:16px">Scan with this</button>
+          </div>
+        </div>
+        <iframe id="libPreviewFrame" title="Resume preview" style="display:none" sandbox="allow-same-origin"></iframe>
+        <pre id="libPreviewText" class="note">Pick a resume or CV on the left to preview.</pre>
+      </div>
+    </div>
+    <details style="margin-top:14px">
+      <summary class="note" style="cursor:pointer;font-weight:700;color:var(--muted)">Save a new document to library</summary>
+      <div style="margin-top:10px">
+        <div class="row">
+          <select id="libKind"><option value="resume">Resume</option><option value="jd">Job description</option></select>
+          <input type="text" id="libLabel" placeholder="Label, e.g. Bloomerang resume">
+        </div>
+        <div style="height:8px"></div>
+        <textarea class="small" id="libContent" placeholder="Paste the document text."></textarea>
+        <div style="height:8px"></div>
+        <button class="primary" type="button" id="libSave" style="font-size:16px;padding:8px 14px">Save</button>
+        <span class="note" id="libStatus"></span>
+      </div>
+    </details>
   </div>
 
   <div class="hero-scan" id="scanWorkspace">
@@ -468,14 +550,81 @@ async function loadInto(selId, taId, isResume) {
   const j = await r.json();
   if (j.text !== undefined) $(taId).value = j.text;
 }
+let libDocs = [], libFilter = 'all', libSelectedId = null, libSelectedText = '';
 async function refreshSources() {
   const r = await api('/api/sources');
   const s = await r.json();
-  $('resumeSel').innerHTML = s.resumes.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
+  libDocs = s.resumes || [];
+  $('resumeSel').innerHTML = libDocs.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
   $('jdSel').innerHTML = '<option value="">— paste a JD, or pick one —</option>' +
     s.jds.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
-  $('compareSel').innerHTML = s.resumes.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
-  if (s.resumes.length) { resumeId = s.resumes[0].id; await loadInto('resumeSel', 'resumeText', true); }
+  $('compareSel').innerHTML = libDocs.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
+  if (libDocs.length) { resumeId = libDocs[0].id; await loadInto('resumeSel', 'resumeText', true); }
+  if ($('libraryPanel').style.display !== 'none') renderLibList();
+}
+function renderLibList() {
+  const list = $('libList');
+  const docs = libDocs.filter(d => libFilter === 'all' ? true : (d.group || 'library') === libFilter);
+  if (!docs.length) {
+    list.innerHTML = '<span class="note" style="padding:12px;display:block">No documents in this filter.</span>';
+    return;
+  }
+  list.innerHTML = docs.map(d =>
+    `<button type="button" class="lib-item ${d.id === libSelectedId ? 'active' : ''}" data-id="${d.id}">
+       <div class="lib-kind">${d.group || 'doc'}${d.kind === 'html' ? ' · html' : ''}</div>
+       <div class="lib-name">${d.label}</div>
+     </button>`).join('');
+  for (const btn of list.querySelectorAll('.lib-item')) {
+    btn.addEventListener('click', () => previewLibDoc(btn.dataset.id));
+  }
+}
+async function previewLibDoc(id) {
+  libSelectedId = id;
+  renderLibList();
+  const doc = libDocs.find(d => d.id === id);
+  $('libPreviewTitle').textContent = doc ? doc.label : 'Preview';
+  $('libUseScanBtn').disabled = true;
+  $('libScanNowBtn').disabled = true;
+  $('libPreviewText').style.display = 'block';
+  $('libPreviewFrame').style.display = 'none';
+  $('libPreviewText').textContent = 'Loading preview…';
+  try {
+    const r = await api('/api/file?id=' + encodeURIComponent(id));
+    const j = await r.json();
+    if (j.error) { $('libPreviewText').textContent = j.error; return; }
+    libSelectedText = j.text || '';
+    $('libUseScanBtn').disabled = !libSelectedText;
+    $('libScanNowBtn').disabled = !libSelectedText;
+    if (j.isHtml) {
+      $('libPreviewText').style.display = 'none';
+      $('libPreviewFrame').style.display = 'block';
+      $('libPreviewFrame').src = '/api/file?id=' + encodeURIComponent(id) + '&format=html';
+    } else {
+      $('libPreviewFrame').style.display = 'none';
+      $('libPreviewFrame').removeAttribute('src');
+      $('libPreviewText').style.display = 'block';
+      $('libPreviewText').textContent = libSelectedText || '(empty)';
+    }
+  } catch {
+    $('libPreviewText').textContent = 'Preview failed.';
+  }
+}
+async function refreshLibrary() {
+  await refreshSources();
+  renderLibList();
+  if (libSelectedId && libDocs.some(d => d.id === libSelectedId)) await previewLibDoc(libSelectedId);
+}
+function useLibInScan(andScan) {
+  if (!libSelectedId || !libSelectedText) return;
+  resumeId = libSelectedId;
+  showDashboard();
+  $('resumeSel').value = libSelectedId;
+  $('resumeText').value = libSelectedText;
+  $('status').textContent = andScan
+    ? 'Resume loaded — add/paste a JD, then hit Scan.'
+    : 'Resume loaded into New Scan.';
+  $('scanWorkspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (andScan && $('jdText').value.trim()) $('scanBtn').click();
 }
 async function refreshNotifs() {
   try {
@@ -624,9 +773,11 @@ function renderJobs() {
         if (j.error) { btn.textContent = j.error; return; }
         $('jdText').value = j.text;
         $('companyInput').value = job.company || '';
-        $('jobsPanel').style.display = 'none'; $('jobsBtn').classList.remove('active');
-        $('status').textContent = `JD loaded for ${job.company} — pick a resume and Run ATS scan.`;
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        if ($('jdTitleInput')) $('jdTitleInput').value = job.title || '';
+        // Jobs view hides the scan workspace — restore it so JD load isn't a blank page.
+        showDashboard();
+        $('status').textContent = `JD loaded for ${job.company} — pick a resume and hit Scan.`;
+        $('scanWorkspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch { btn.textContent = 'fetch failed'; }
       finally { btn.disabled = false; if (btn.textContent === 'Fetching JD…') btn.textContent = 'Load JD & scan'; }
     });
@@ -689,6 +840,10 @@ async function refreshJobs() {
     renderJobs();
   } catch { /* auth */ }
 }
+$('jobsReloadBtn').addEventListener('click', () => {
+  $('jobsRefreshStatus').textContent = 'Reloading job list…';
+  refreshJobs();
+});
 $('jobsRefreshBtn').addEventListener('click', async () => {
   $('jobsRefreshBtn').disabled = true;
   $('jobsRefreshStatus').textContent = 'Starting portal scan…';
@@ -706,6 +861,17 @@ $('jobsRefreshBtn').addEventListener('click', async () => {
     $('jobsRefreshBtn').disabled = false;
   }
 });
+for (const chip of document.querySelectorAll('[data-libf]')) {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('[data-libf]').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    libFilter = chip.dataset.libf;
+    renderLibList();
+  });
+}
+$('libRefreshBtn').addEventListener('click', () => refreshLibrary());
+$('libUseScanBtn').addEventListener('click', () => useLibInScan(false));
+$('libScanNowBtn').addEventListener('click', () => useLibInScan(true));
 for (const chip of document.querySelectorAll('.fchip')) {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.fchip').forEach(c => c.classList.remove('active'));
@@ -901,9 +1067,10 @@ $('loginBtn').addEventListener('click', async () => {
 });
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
 const TABS = [['notifBtn', 'notifPanel', null], ['trackerBtn', 'trackerPanel', refreshTracker],
-  ['jobsBtn', 'jobsPanel', refreshJobs], ['historyBtn', 'historyPanel', refreshHistory], ['libraryBtn', 'libraryPanel', null]];
+  ['jobsBtn', 'jobsPanel', refreshJobs], ['historyBtn', 'historyPanel', refreshHistory], ['libraryBtn', 'libraryPanel', refreshLibrary]];
 function setHomeVisible(on) {
   $('welcomeBlock').style.display = on ? 'block' : 'none';
+  $('nextStepsCard').style.display = on ? 'block' : 'none';
   $('dashCards').style.display = on ? 'grid' : 'none';
   $('scanWorkspace').style.display = on ? 'block' : 'none';
   $('tailorCard').style.display = on ? 'block' : 'none';
@@ -916,6 +1083,59 @@ function showDashboard() {
   $('dashBtn').classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+async function refreshNextSteps() {
+  const body = $('nextStepsBody');
+  const meta = $('nextStepsMeta');
+  const btn = $('nextStepsRefreshBtn');
+  if (btn) btn.disabled = true;
+  body.innerHTML = '<span class="note">Refreshing…</span>';
+  try {
+    const r = await api('/api/next-steps');
+    const j = await r.json();
+    if (!j.available && !(j.actions && j.actions.length)) {
+      body.innerHTML = '<span class="note">No apply board yet (<code>data/apply-board.md</code>).</span>';
+      meta.textContent = 'From your apply board';
+      return;
+    }
+    meta.textContent = j.updated ? `Updated ${j.updated}` : 'From your apply board';
+    const parts = [];
+    if (j.info && j.info.length) {
+      parts.push(`<p class="note" style="margin:0 0 10px">${j.info.map(esc).join(' · ')}</p>`);
+    }
+    if (j.actions && j.actions.length) {
+      parts.push('<h3 style="margin:0 0 8px;font-size:18px">Do next</h3><ol style="margin:0 0 14px;padding-left:20px">');
+      for (const a of j.actions) {
+        parts.push(`<li style="margin-bottom:8px"><strong>${esc(a.title)}</strong>${a.detail ? ` — ${esc(a.detail)}` : ''}</li>`);
+      }
+      parts.push('</ol>');
+    }
+    if (j.applyNow && j.applyNow.length) {
+      parts.push('<h3 style="margin:0 0 8px;font-size:18px">Apply now</h3><ul style="margin:0 0 14px;padding-left:18px">');
+      for (const a of j.applyNow) {
+        const link = a.url ? ` <a href="${esc(a.url)}" target="_blank" rel="noopener">Open JD</a>` : '';
+        parts.push(`<li style="margin-bottom:10px"><strong>${esc(a.title)}</strong>${link}${a.blurb ? `<div class="note" style="margin-top:4px">${esc(a.blurb)}</div>` : ''}</li>`);
+      }
+      parts.push('</ul>');
+    }
+    if (j.checks && j.checks.length) {
+      parts.push('<h3 style="margin:0 0 8px;font-size:18px">Check first</h3><ul style="margin:0;padding-left:18px">');
+      for (const c of j.checks.slice(0, 5)) {
+        const link = c.url ? ` <a href="${esc(c.url)}" target="_blank" rel="noopener">Link</a>` : '';
+        parts.push(`<li style="margin-bottom:8px"><strong>${esc(c.id)} · ${esc(c.company)}</strong> — ${esc(c.role)}${link}<div class="note" style="margin-top:4px">${esc(c.note)}</div></li>`);
+      }
+      parts.push('</ul>');
+    }
+    body.innerHTML = parts.join('') || '<span class="note">Board loaded, but no open actions parsed.</span>';
+  } catch {
+    body.innerHTML = '<span class="err">Could not load next steps.</span>';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+$('nextStepsRefreshBtn').addEventListener('click', refreshNextSteps);
 $('dashBtn').addEventListener('click', showDashboard);
 for (const [btn, panel, onOpen] of TABS) {
   $(btn).addEventListener('click', () => {
@@ -938,7 +1158,13 @@ $('libSave').addEventListener('click', async () => {
     body: JSON.stringify({ kind: $('libKind').value, label: $('libLabel').value, content: $('libContent').value }) });
   const j = await r.json();
   $('libStatus').textContent = j.id ? 'Saved.' : (j.error || 'Error');
-  if (j.id) { refreshSources(); refreshNotifs(); }
+  if (j.id) {
+    $('libLabel').value = '';
+    $('libContent').value = '';
+    await refreshLibrary();
+    refreshNotifs();
+    if (j.id) previewLibDoc(String(j.id));
+  }
 });
 $('tailorBtn').addEventListener('click', async () => {
   if (!$('jdText').value.trim()) { $('tailorOut').textContent = 'Paste or load a JD first.'; return; }
@@ -948,21 +1174,37 @@ $('tailorBtn').addEventListener('click', async () => {
     const r = await api('/api/tailor', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jdText: $('jdText').value, company: $('companyInput').value.trim(),
         jdTitle: $('jdTitleInput').value.trim(), format: $('tailorFormat').value }) });
-    const j = await r.json();
-    if (j.error) { $('tailorOut').innerHTML = `<span class="err">${j.error}</span>`; return; }
+    let j = {};
+    try { j = await r.json(); } catch { j = {}; }
+    if (!r.ok || j.error) {
+      const detail = j.issues ? `<pre class="note" style="white-space:pre-wrap;margin-top:8px">${esc(String(j.issues).slice(-900))}</pre>` : '';
+      $('tailorOut').innerHTML = `<span class="err">${esc(j.error || `Tailor failed (HTTP ${r.status})`)}</span>${detail}`;
+      return;
+    }
+    const pdfLink = j.pdfOk && j.pdfName
+      ? ` · <a href="/api/download?name=${encodeURIComponent(j.pdfName)}">Download PDF</a>`
+      : ' · <span class="note">PDF not ready</span>';
+    const htmlLink = j.htmlId
+      ? ` · <a href="/api/file?id=${encodeURIComponent(j.htmlId)}&format=html" target="_blank" rel="noopener">Open HTML</a>`
+      : '';
+    const warn = j.warning ? `<div class="note" style="margin-top:8px">${esc(j.warning)}</div>` : '';
+    const issues = (!j.pdfOk && j.issues) ? `<pre class="note" style="white-space:pre-wrap;margin-top:8px">${esc(String(j.issues).slice(-700))}</pre>` : '';
     $('tailorOut').innerHTML =
-      `✅ Tailored ${j.format} for <b>${j.company}</b> — keyword coverage ${j.before}% → <b>${j.after}%</b> · JD keywords placed in Skills: ${j.skillsBefore} → <b>${j.skillsAfter}</b>` +
-      (j.ats ? ` · parseability ${j.ats.score}/100 ${j.ats.grade || ''}` : '') +
-      ` · <a href="/api/download?name=${encodeURIComponent(j.pdfName)}">Download PDF</a>` +
-      ` · <a href="#" id="tailorLoad">Load into scanner &amp; rescan</a> (also saved to Library)`;
+      `✅ Tailored ${esc(j.format)} for <b>${esc(j.company)}</b> — keyword coverage ${j.before}% → <b>${j.after}%</b> · JD keywords in Skills: ${j.skillsBefore} → <b>${j.skillsAfter}</b>` +
+      (j.ats ? ` · parseability ${j.ats.score}/100 ${esc(j.ats.grade || '')}` : '') +
+      pdfLink + htmlLink +
+      ` · <a href="#" id="tailorLoad">Load into scanner &amp; rescan</a> (also saved to Library)` +
+      warn + issues;
     $('tailorLoad').addEventListener('click', e => {
       e.preventDefault();
-      $('resumeText').value = j.text;
+      $('resumeText').value = j.text || '';
       $('status').textContent = 'Tailored text loaded — hit Run ATS scan.';
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
     refreshNotifs(); refreshSources();
-  } catch { $('tailorOut').innerHTML = '<span class="err">Tailor failed (server error).</span>'; }
+  } catch (err) {
+    $('tailorOut').innerHTML = `<span class="err">Tailor failed: ${esc(err && err.message ? err.message : 'server error')}</span>`;
+  }
   finally { $('tailorBtn').disabled = false; }
 });
 $('compareBtn').addEventListener('click', async () => {
@@ -1114,7 +1356,7 @@ async function init() {
     $('storeInfo').textContent = msg;
   } catch { /* ignore */ }
   await refreshSources();
-  refreshNotifs(); refreshHistory(); refreshDashTracker();
+  refreshNotifs(); refreshHistory(); refreshDashTracker(); refreshNextSteps();
   $('dashBtn').classList.add('active');
   setInterval(refreshNotifs, 60000);
   setInterval(() => {

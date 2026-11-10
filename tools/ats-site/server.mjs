@@ -238,21 +238,35 @@ const store = DB_URL ? {
 };
 
 // ── Repo-file sources (exist locally; absent on hosted deploys) ──────────────
+function prettyDocLabel(file, group) {
+  const base = String(file || '').replace(/\.html$/i, '').replace(/^site-/, '');
+  const nice = base.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+  return group === 'cv' ? `CV — ${nice}` : group === 'resume' ? `Resume — ${nice}` : nice;
+}
 function repoSources() {
   const resumes = [], jds = [];
   const cv = join(ROOT, 'cv.md');
-  if (existsSync(cv)) resumes.push({ id: 'repo:cv', label: 'cv.md — master CV', path: cv, kind: 'md' });
-  for (const dir of ['output/source/resumes', 'output/source/cvs']) {
+  if (existsSync(cv)) {
+    resumes.push({ id: 'repo:cv', label: 'Master CV (cv.md)', path: cv, kind: 'md', group: 'master' });
+  }
+  for (const [dir, group] of [['output/source/resumes', 'resume'], ['output/source/cvs', 'cv']]) {
     const abs = join(ROOT, dir);
     if (!existsSync(abs)) continue;
     for (const f of readdirSync(abs).filter(f => f.endsWith('.html')).sort()) {
-      resumes.push({ id: `repo:${dir}/${f}`, label: `${dir.replace('output/source/', '')}/${f}`, path: join(abs, f), kind: 'html' });
+      resumes.push({
+        id: `repo:${dir}/${f}`,
+        label: prettyDocLabel(f, group),
+        path: join(abs, f),
+        kind: 'html',
+        group,
+        file: f,
+      });
     }
   }
   const jdDir = join(ROOT, 'jds');
   if (existsSync(jdDir)) {
     for (const f of readdirSync(jdDir).filter(f => f.endsWith('.md')).sort()) {
-      jds.push({ id: `repo:jds/${f}`, label: f, path: join(jdDir, f), kind: 'md' });
+      jds.push({ id: `repo:jds/${f}`, label: f, path: join(jdDir, f), kind: 'md', group: 'jd' });
     }
   }
   return { resumes, jds };
@@ -342,6 +356,66 @@ function parseTracker() {
       notes: m[9].trim(), url: (m[10] || '').trim() });
   }
   return rows;
+}
+
+// ── Next steps — from data/apply-board.md (user board) ────────────────────────
+function readNextSteps() {
+  const boardPath = join(ROOT, 'data/apply-board.md');
+  const dumpPath = join(ROOT, 'data/charlotte-fit-candidates.json');
+  const out = {
+    available: false,
+    updated: null,
+    summary: null,
+    actions: [],
+    applyNow: [],
+    checks: [],
+    info: [],
+  };
+  if (existsSync(dumpPath)) {
+    try {
+      const dump = JSON.parse(readFileSync(dumpPath, 'utf8'));
+      out.summary = dump.summary || null;
+      out.updated = (dump.summary && dump.summary.scanned_at) || null;
+    } catch { /* ignore */ }
+  }
+  if (!existsSync(boardPath)) return out;
+  out.available = true;
+  const md = readFileSync(boardPath, 'utf8');
+  const updated = md.match(/Updated:\s*\*\*([^*]+)\*\*/);
+  if (updated) out.updated = updated[1].trim();
+  const section = (name) => {
+    const re = new RegExp(`##[^\\n]*${name}[\\s\\S]*?(?=\\n## |\\n<details|\\n---|$)`, 'i');
+    const m = md.match(re);
+    return m ? m[0] : '';
+  };
+  const next = section('Next actions');
+  for (const line of next.split('\n')) {
+    const m = line.match(/^\d+\.\s+\*\*(.+?)\*\*:?\s*(.*)$/) || line.match(/^\d+\.\s+(.+)$/);
+    if (m) out.actions.push({ title: (m[1] || '').replace(/\*\*/g, '').trim(), detail: (m[2] || '').replace(/\*\*/g, '').trim() });
+  }
+  const apply = section('Apply now');
+  const applyBlocks = apply.split(/\n(?=\*\*[^*\n]+—|\*\*[^*\n]+ - )/).slice(1);
+  for (const block of applyBlocks.slice(0, 6)) {
+    const title = (block.match(/^\*\*(.+?)\*\*/) || [])[1];
+    const url = (block.match(/https?:\/\/\S+/) || [])[0];
+    const blurb = block.replace(/^\*\*.+?\*\*\s*/, '').replace(/→\s*https?:\/\/\S+/, '').replace(/\n+/g, ' ').trim().slice(0, 280);
+    if (title && !/was applied/i.test(title)) out.applyNow.push({ title: title.replace(/\s+/g, ' ').trim(), url: url || null, blurb });
+  }
+  const check = section('Check first');
+  for (const row of check.split('\n')) {
+    if (!row.startsWith('|') || /\|\s*#\s*\|/.test(row) || /^\|[-| ]+\|$/.test(row)) continue;
+    const cells = row.split('|').map(c => c.trim()).filter(Boolean);
+    if (cells.length < 4) continue;
+    if (!/^C\d+/i.test(cells[0])) continue; // only board check rows (C3, C6…), not Applied tables
+    const link = (cells[4] || '').match(/\((https?:\/\/[^)]+)\)/);
+    out.checks.push({
+      id: cells[0], company: cells[1].replace(/\*\*/g, ''), role: cells[2],
+      note: cells[3].replace(/\*\*/g, '').slice(0, 220), url: link ? link[1] : null,
+    });
+  }
+  if (out.summary && out.summary.refresh_2026_11_10) out.info.push(String(out.summary.refresh_2026_11_10));
+  else if (out.summary && out.summary.new_apply) out.info.push(`New apply: ${(out.summary.new_apply || []).join('; ')}`);
+  return out;
 }
 
 // ── Jobs feed — scored dump + fresh scan-history (auto-refresh) ──────────────
@@ -528,10 +602,12 @@ function buildAtsRules(vendor, company, resumeText, coverage, checks) {
 
 // ── Resume tailorer — deterministic: selects/reorders verbatim cv.md facts ──
 function playwrightBrowsersPath() {
-  // Prefer the real user cache — sandboxed shells may inject an empty cache path.
+  // Prefer an explicit env path, then the real user cache (not a sandbox temp).
+  const envPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (envPath && existsSync(envPath)) return envPath;
   const homeCache = join(process.env.HOME || '', 'Library/Caches/ms-playwright');
-  if (existsSync(join(homeCache, 'chromium_headless_shell-1243')) || existsSync(homeCache)) return homeCache;
-  return process.env.PLAYWRIGHT_BROWSERS_PATH || homeCache;
+  if (existsSync(homeCache)) return homeCache;
+  return envPath || homeCache;
 }
 function runNodeFull(args, opts = {}) {
   return new Promise((resolveRun) => {
@@ -554,7 +630,11 @@ function parseCv(md) {
     if (contact) { cv[contact[1].toLowerCase()] = contact[2].trim(); continue; }
     const h2 = line.match(/^##\s+(.+)/);
     if (h2) { flush(); section = h2[1].trim(); continue; }
-    if (section === 'Professional Summary' && line) { cv.summary += (cv.summary ? ' ' : '') + line; continue; }
+    if (section === 'Professional Summary' && line) {
+      const bullet = line.replace(/^[-*•]\s+/, '').trim();
+      if (bullet) cv.summary += (cv.summary ? '\n' : '') + `• ${bullet}`;
+      continue;
+    }
     if (section === 'Work Experience' || section === 'Projects') {
       const h3 = line.match(/^###\s+(.+)/);
       if (h3) {
@@ -595,36 +675,84 @@ function parseCv(md) {
   return cv;
 }
 
+/** Human-typing QA for resume/CV text (modes/_custom.md). */
+function polishHumanTyping(text, { stripSummaryLocation = false } = {}) {
+  let s = String(text || '');
+  s = s.replace(/\bU\.?S\.?\s*citizen\b[,.]?/gi, '');
+  s = s.replace(/\bno (visa )?sponsorship( needed| required)?\b[,.]?/gi, '');
+  if (stripSummaryLocation) {
+    s = s.replace(/\bCharlotte-based\b/gi, '');
+    s = s.replace(/\b(based in|located in|from)\s+Charlotte(,? NC)?\b/gi, '');
+    s = s.replace(/\bCharlotte preferred\b/gi, '');
+    s = s.replace(/\blocal to [A-Z][A-Za-z .'-]+\b/gi, '');
+    s = s.replace(/,?\s*Charlotte\s*\([^)]*\)/gi, '');
+    s = s.replace(/,?\s*Charlotte,? NC\b/gi, '');
+    s = s.replace(/\bin Fort Mill\b[^.]*/gi, '');
+  }
+  s = s.replace(/\s*--\s*/g, ' – ');
+  s = s.replace(/\s{2,}/g, ' ').replace(/\s+([,.;:])/g, '$1');
+  s = s.replace(/\s+;\s*;/g, ';').replace(/^[\s,;.–-]+|[\s,;.–-]+$/g, '').trim();
+  return s;
+}
+
+function summaryAsBullets(summary) {
+  let s = String(summary || '').trim();
+  if (!s) return '';
+  const lines = s.split(/\n+/).map(line => polishHumanTyping(line.replace(/^[-*•]\s+/, ''), { stripSummaryLocation: true }))
+    .filter(Boolean);
+  if (!lines.length) return '';
+  if (lines.length > 1 || /^[-*•]/.test(summary.trim())) {
+    return lines.map(l => `• ${l}`).join('\n');
+  }
+  // Paragraph → a few bullets on sentence boundaries (max 4).
+  const parts = lines[0].split(/(?<=[.!?])\s+/).map(p => polishHumanTyping(p, { stripSummaryLocation: true })).filter(Boolean).slice(0, 4);
+  return parts.map(p => `• ${p}`).join('\n');
+}
+
 function tailorPayload(cv, jdText, { company, jdTitle, format, bulletCap }) {
   const keywords = mineKeywords(jdText).map(k => k.term);
   const score = (text) => keywords.reduce((a, k) => a + keywordCount(k, text), 0) + (/\d/.test(text) ? 1 : 0);
   const byScore = (arr) => arr.map((b, i) => ({ b, i, s: score(b) }))
-    .sort((x, y) => y.s - x.s || x.i - y.i).map(x => x.b);
+    .sort((x, y) => y.s - x.s || x.i - y.i).map(x => polishHumanTyping(x.b));
   const experience = cv.experience.map(e => ({
-    company: e.company, role: e.role, location: e.location, dates: e.dates,
+    company: polishHumanTyping(e.company), role: polishHumanTyping(e.role),
+    location: e.location, dates: e.dates,
     bullets: byScore(e.bullets).slice(0, bulletCap),
   })).filter(e => e.bullets.length);
   const projects = cv.projects
     .map(p => ({ p, s: p.bullets.reduce((a, b) => a + score(b), 0) }))
     .sort((x, y) => y.s - x.s)
     .slice(0, format === 'cv' ? 99 : 2)
-    .map(({ p }) => ({ name: p.name, tech: p.dates || '',
-      description: byScore(p.bullets).slice(0, 2).join(' ') }));
-  const skills = cv.skills.map(s => {
-    const items = s.items.split(/,\s*/);
-    const matched = items.filter(it => keywords.some(k => keywordCount(k, it) > 0));
-    const rest = items.filter(it => !matched.includes(it));
-    return { category: s.category, items: [...matched, ...rest].join(', '),
-      _s: matched.length };
-  }).sort((a, b) => b._s - a._s).map(({ _s, ...s }) => s);
+    .map(({ p }) => ({ name: polishHumanTyping(p.name), tech: p.dates || '',
+      description: polishHumanTyping(byScore(p.bullets).slice(0, 2).join(' ')) }));
+  const skills = cv.skills
+    .filter(s => !/^spoken$/i.test(s.category) && !/spanish/i.test(s.items))
+    .map(s => {
+      const items = s.items.split(/,\s*/).map(polishHumanTyping).filter(Boolean)
+        .filter(it => !/spanish/i.test(it));
+      const matched = items.filter(it => keywords.some(k => keywordCount(k, it) > 0));
+      const rest = items.filter(it => !matched.includes(it));
+      return { category: s.category, items: [...matched, ...rest].join(', '),
+        _s: matched.length };
+    }).filter(s => s.items).sort((a, b) => b._s - a._s).map(({ _s, ...s }) => s);
+  const education = (cv.education || []).map(e => ({
+    ...e,
+    title: polishHumanTyping(e.title),
+    org: polishHumanTyping(e.org),
+    description: polishHumanTyping(String(e.description || '')
+      .replace(/\bU\.?S\.?\s*citizen\b[^·|]*/gi, '')
+      .replace(/\bno sponsorship[^.·|]*/gi, '')
+      .replace(/\bCharlotte preferred\b/gi, '')
+      .replace(/\s*·\s*·+/g, ' · ').replace(/^\s*·\s*|\s*·\s*$/g, '').trim()),
+  }));
   return {
     lang: 'en', page_format: 'letter',
     candidate: { name: cv.name, title: jdTitle || '', phone: cv.phone, email: cv.email,
       linkedin: { url: 'https://' + cv.linkedin.replace(/^https?:\/\//, ''), display: cv.linkedin },
       github: { url: 'https://' + cv.github.replace(/^https?:\/\//, ''), display: cv.github },
       location: cv.location },
-    summary: cv.summary, experience, projects,
-    education: cv.education, certifications: cv.certifications, skills,
+    summary: summaryAsBullets(cv.summary), experience, projects,
+    education, certifications: cv.certifications, skills,
   };
 }
 
@@ -769,16 +897,30 @@ const server = http.createServer(async (req, res) => {
       const repo = repoSources();
       const [dbResumes, dbJds] = await Promise.all([store.listDocs('resume'), store.listDocs('jd')]);
       return json(res, 200, {
-        resumes: [...repo.resumes.map(({ id, label }) => ({ id, label })),
-                  ...dbResumes.map(d => ({ id: String(d.id), label: d.label }))],
-        jds: [...repo.jds.map(({ id, label }) => ({ id, label })),
-              ...dbJds.map(d => ({ id: String(d.id), label: d.label }))],
+        resumes: [
+          ...repo.resumes.map(({ id, label, group, kind }) => ({ id, label, group, kind: kind || 'md' })),
+          ...dbResumes.map(d => ({ id: String(d.id), label: d.label, group: 'library', kind: 'library' })),
+        ],
+        jds: [
+          ...repo.jds.map(({ id, label, group }) => ({ id, label, group: group || 'jd' })),
+          ...dbJds.map(d => ({ id: String(d.id), label: d.label, group: 'library' })),
+        ],
       });
     }
     if (req.method === 'GET' && url.pathname === '/api/file') {
-      const doc = await resolveDoc(url.searchParams.get('id') || '');
+      const id = url.searchParams.get('id') || '';
+      const doc = await resolveDoc(id);
       if (!doc) return json(res, 404, { error: 'not found' });
-      return json(res, 200, { id: url.searchParams.get('id'), text: doc.isHtml ? htmlToText(doc.content) : doc.content });
+      if (url.searchParams.get('format') === 'html' && doc.isHtml) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(doc.content);
+      }
+      return json(res, 200, {
+        id,
+        label: doc.label,
+        isHtml: !!doc.isHtml,
+        text: doc.isHtml ? htmlToText(doc.content) : doc.content,
+      });
     }
     if (req.method === 'POST' && url.pathname === '/api/documents') {
       const { kind, label, content } = JSON.parse(await readBody(req) || '{}');
@@ -813,6 +955,9 @@ const server = http.createServer(async (req, res) => {
       const rows = parseTracker();
       if (!rows) return json(res, 200, { available: false, rows: [] });
       return json(res, 200, { available: true, rows });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/next-steps') {
+      return json(res, 200, readNextSteps());
     }
     if (req.method === 'POST' && url.pathname === '/api/tracker/status') {
       const { num, status } = JSON.parse(await readBody(req) || '{}');
@@ -889,7 +1034,7 @@ const server = http.createServer(async (req, res) => {
       const keywords = mineKeywords(jdText).map(k => k.term);
       const before = analyzeCoverage(keywords, cvRaw).coveragePct;
 
-      let built = null, lastErr = '';
+      let built = null, lastErr = '', pdfOk = false;
       for (const cap of (format === 'cv' ? [99] : [5, 4, 3, 2])) {
         const doc = tailorPayload(cv, jdText, { company, jdTitle, format, bulletCap: cap });
         writeFileSync(jsonPath, JSON.stringify(doc, null, 2));
@@ -902,10 +1047,16 @@ const server = http.createServer(async (req, res) => {
         if (html.code !== 0) { lastErr = (html.stdout + html.stderr).slice(-800); continue; }
         const pdfArgs = ['generate-pdf.mjs', htmlPath, pdfPath, ...(format === 'resume' ? ['--max-pages=1', '--strict-pages'] : [])];
         const pdf = await runNodeFull(pdfArgs, { timeout: 150000 });
-        if (pdf.code === 0) { built = { cap }; break; }
+        if (pdf.code === 0) { built = { cap }; pdfOk = true; break; }
+        built = { cap }; // keep HTML even if PDF fails
         lastErr = (pdf.stdout + pdf.stderr).slice(-800);
       }
-      if (!built) return json(res, 500, { error: 'PDF build failed', issues: lastErr });
+      if (!built || !existsSync(htmlPath)) {
+        return json(res, 500, {
+          error: 'Tailor build failed',
+          issues: lastErr || 'No HTML/PDF output. Try: npx playwright install chromium',
+        });
+      }
       const htmlContent = readFileSync(htmlPath, 'utf8');
       const ats = await parseabilityScore(htmlContent);
       const tailoredText = htmlToText(htmlContent);
@@ -918,8 +1069,19 @@ const server = http.createServer(async (req, res) => {
       const inSkills = (text) => keywords.filter(k => keywordCount(k, skillsSlice(text)) > 0).length;
       const skillsBefore = inSkills(cvRaw), skillsAfter = inSkills(tailoredText);
       await store.addDoc('resume', `Tailored ${format} — ${company} (${new Date().toISOString().slice(0, 10)})`, htmlContent);
-      await store.addNotif({ kind: 'tailor', title: `Tailored ${format} ready: ${company}`, body: `Coverage ${before}% → ${after}% · JD keywords in Skills ${skillsBefore} → ${skillsAfter} · PDF: ${pdfName}`, key: `tailor-${base}-${Date.now()}` });
-      return json(res, 200, { ok: true, format, company, pdfName, ats, before, after, skillsBefore, skillsAfter, text: tailoredText });
+      await store.addNotif({
+        kind: 'tailor',
+        title: `Tailored ${format} ready: ${company}${pdfOk ? '' : ' (HTML only)'}`,
+        body: `Coverage ${before}% → ${after}% · JD keywords in Skills ${skillsBefore} → ${skillsAfter}${pdfOk ? ` · PDF: ${pdfName}` : ' · PDF skipped'}`,
+        key: `tailor-${base}-${Date.now()}`,
+      });
+      const htmlId = `repo:output/source/${kind}/${base}.html`;
+      return json(res, 200, {
+        ok: true, format, company, pdfName: pdfOk ? pdfName : null, pdfOk, htmlId, ats, before, after,
+        skillsBefore, skillsAfter, text: tailoredText,
+        warning: pdfOk ? null : 'HTML tailored resume saved to Resume Manager; PDF needs Playwright Chromium (npx playwright install chromium).',
+        issues: pdfOk ? null : lastErr,
+      });
     }
     if (req.method === 'GET' && url.pathname === '/api/ai-status') {
       return json(res, 200, await ollamaStatus());

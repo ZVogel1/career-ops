@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MatchScan font samples</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Jersey+10&family=Jersey+15&family=Jersey+25&family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f4f7f6; --panel:#fff; --line:#dce6e2; --ink:#10231c;
+    --green:#1f8a5b; --quiet:#8a9691; --text:#1a2421;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:28px; background:var(--bg); color:var(--text);
+    font:16px/1.5 system-ui,sans-serif;
+  }
+  h1 { font-size:22px; margin:0 0 6px; color:var(--ink); }
+  .intro { color:var(--quiet); margin:0 0 22px; max-width:640px; }
+  .grid { display:grid; gap:14px; max-width:920px; }
+  .card {
+    background:var(--panel); border:1px solid var(--line); border-radius:7px;
+    padding:16px 18px; box-shadow:0 4px 18px rgba(16,35,28,.06);
+  }
+  .meta { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .name { font:700 13px/1.2 system-ui,sans-serif; color:var(--green); letter-spacing:.02em; text-transform:uppercase; }
+  .tag { font:12px system-ui,sans-serif; color:var(--quiet); }
+  .sample-h { margin:0 0 6px; color:var(--ink); }
+  .sample-b { margin:0; color:var(--quiet); }
+  .btn {
+    display:inline-block; margin-top:12px; background:var(--green); color:#fff;
+    border:0; border-radius:5px; padding:8px 12px; font:inherit; cursor:default;
+  }
+  code { font-size:12px; background:#eef3f1; padding:2px 6px; border-radius:4px; }
+</style>
+</head>
+<body>
+  <h1>MatchScan — pixel font samples</h1>
+  <p class="intro">Same light + green vibe. Pick a heading font (or heading + body). Reply with the number you like (e.g. “3 for headings, keep Source Sans for body” or “5 everywhere”).</p>
+
+  <div class="grid">
+    <section class="card" style="font-family:'Pixelify Sans',sans-serif">
+      <div class="meta"><span class="name">1 · Pixelify Sans</span><span class="tag">Best all-rounder · readable at UI sizes</span></div>
+      <p class="sample-h" style="font-size:28px;font-weight:700">Welcome back</p>
+      <p class="sample-b" style="font-size:15px;font-weight:500">Drop in your resume and a job description to get your Match Rate.</p>
+      <span class="btn" style="font-weight:700">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:'Jersey 15',sans-serif">
+      <div class="meta"><span class="name">2 · Jersey 15</span><span class="tag">Soft pixel · great headings, ok body</span></div>
+      <p class="sample-h" style="font-size:34px">Welcome back</p>
+      <p class="sample-b" style="font-size:20px;color:var(--quiet)">Drop in your resume and a job description to get your Match Rate.</p>
+      <span class="btn" style="font-size:18px">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:'Jersey 10',sans-serif">
+      <div class="meta"><span class="name">3 · Jersey 10</span><span class="tag">Chunkier pixel · headings only recommended</span></div>
+      <p class="sample-h" style="font-size:36px">Welcome back</p>
+      <p class="sample-b" style="font-size:22px;color:var(--quiet)">Drop in your resume and a job description to get your Match Rate.</p>
+      <span class="btn" style="font-size:20px">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:'Jersey 25',sans-serif">
+      <div class="meta"><span class="name">4 · Jersey 25</span><span class="tag">Tall pixel · display / brand wordmark</span></div>
+      <p class="sample-h" style="font-size:40px">MatchScan</p>
+      <p class="sample-b" style="font-size:24px;color:var(--quiet)">New scan · Find Jobs · Job Tracker</p>
+      <span class="btn" style="font-size:22px">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:VT323,monospace">
+      <div class="meta"><span class="name">5 · VT323</span><span class="tag">Terminal pixel · very readable body</span></div>
+      <p class="sample-h" style="font-size:34px">Welcome back</p>
+      <p class="sample-b" style="font-size:22px;color:var(--quiet)">Drop in your resume and a job description to get your Match Rate.</p>
+      <span class="btn" style="font-size:20px">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:Silkscreen,sans-serif">
+      <div class="meta"><span class="name">6 · Silkscreen</span><span class="tag">Classic bitmap · crisp, a bit narrow</span></div>
+      <p class="sample-h" style="font-size:24px;font-weight:700">Welcome back</p>
+      <p class="sample-b" style="font-size:14px;color:var(--quiet)">Drop in your resume and a job description to get your Match Rate.</p>
+      <span class="btn" style="font-size:13px;font-weight:700">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:DotGothic16,sans-serif">
+      <div class="meta"><span class="name">7 · DotGothic16</span><span class="tag">Rounded pixel · friendly UI feel</span></div>
+      <p class="sample-h" style="font-size:28px">Welcome back</p>
+      <p class="sample-b" style="font-size:16px;color:var(--quiet)">Drop in your resume and a job description to get your Match Rate.</p>
+      <span class="btn">Scan</span>
+    </section>
+
+    <section class="card" style="font-family:'Press Start 2P',system-ui">
+      <div class="meta"><span class="name">8 · Press Start 2P</span><span class="tag">Arcade · fun brand only (hard for paragraphs)</span></div>
+      <p class="sample-h" style="font-size:16px;line-height:1.6">Welcome back</p>
+      <p class="sample-b" style="font-size:10px;line-height:1.8;color:var(--quiet)">Match Rate 75%+</p>
+      <span class="btn" style="font-size:10px;line-height:1.4">Scan</span>
+    </section>
+
+    <section class="card">
+      <div class="meta"><span class="name">Hybrid A · Pixelify heads + quiet sans body</span><span class="tag">Usually the most usable</span></div>
+      <p class="sample-h" style="font-family:'Pixelify Sans',sans-serif;font-size:28px;font-weight:700;margin:0 0 6px">Welcome back</p>
+      <p class="sample-b" style="font:15px/1.5 system-ui,sans-serif;color:var(--quiet);margin:0">Drop in your resume and a job description to get your Match Rate in about 30 seconds.</p>
+      <span class="btn" style="font-family:'Pixelify Sans',sans-serif;font-weight:700">Scan</span>
+    </section>
+
+    <section class="card">
+      <div class="meta"><span class="name">Hybrid B · Jersey 15 heads + VT323 body</span><span class="tag">Full pixel stack, still readable</span></div>
+      <p class="sample-h" style="font-family:'Jersey 15',sans-serif;font-size:34px;margin:0 0 6px">Welcome back</p>
+      <p class="sample-b" style="font-family:VT323,monospace;font-size:22px;color:var(--quiet);margin:0">Drop in your resume and a job description to get your Match Rate in about 30 seconds.</p>
+      <span class="btn" style="font-family:'Jersey 15',sans-serif;font-size:18px">Scan</span>
+    </section>
+  </div>
+
+  <p class="intro" style="margin-top:22px">Open this file: <code>tools/ats-site/font-samples.html</code> — or with the server running: <code>http://127.0.0.1:4317/font-samples.html</code> (needs a tiny server route; local file open works too).</p>
+</body>
+</html>

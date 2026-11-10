@@ -772,7 +772,8 @@ function renderReport(payload, partials) {
     PAGE_WIDTH: pageWidth,
     NAME: escapeHtml(candidate.name || ''),
     SECTION_SUMMARY: escapeHtml(sectionTitles.summary),
-    SUMMARY_TEXT: escapeHtml(payload.summary),
+    // Preserve summary line breaks (bullet summaries) as <br>; escape first so raw HTML never injects.
+    SUMMARY_TEXT: escapeHtml(payload.summary).replace(/\r?\n/g, '<br>\n'),
     SECTION_COMPETENCIES: escapeHtml(sectionTitles.competencies),
     COMPETENCIES: buildCompetencies(payload.competencies, partials.get('competencies')),
     SECTION_EXPERIENCE: escapeHtml(sectionTitles.experience),

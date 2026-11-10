@@ -6,7 +6,8 @@ Standing prefs also live in `modes/_custom.md` (user layer).
 
 - Light product UI (Jobscan-like workspace layout — not Jobscan branding)
 - **Green** primary (`#1f8a5b` / `#146644`), soft green fills (`#e7f5ee`)
-- **Bold** page/section headings; **quiet** helper/instructional copy (`#8a9691`)
+- **Typography:** headings / brand / primary buttons = **Jersey 10**; body + quiet copy = Source Sans 3
+- **Bold/pixel headings**; **quiet** helper/instructional copy (`#8a9691`)
 - Cards with **modest** radius (~7px), inputs/buttons ~5px — not pill-round
 
 ## Layout
