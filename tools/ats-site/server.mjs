@@ -18,7 +18,7 @@
  * Run hosted: PORT/DATABASE_URL/SITE_PASSWORD from env  (see render.yaml + README)
  */
 import http from 'node:http';
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -344,6 +344,13 @@ async function genFollowupNotifs() {
 
 // ── Tracker (kanban) — reads data/applications.md, writes via set-status.mjs ─
 const CANONICAL_STATES = ['Evaluated', 'Applied', 'Responded', 'Interview', 'Offer', 'Hired', 'Rejected', 'Discarded', 'SKIP'];
+const DECISIONS_PATH = join(ROOT, 'data/board-decisions.json');
+const OUTREACH_DIR = join(ROOT, 'data/outreach');
+
+function normCo(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function parseTracker() {
   const p = join(ROOT, 'data/applications.md');
   if (!existsSync(p)) return null;
@@ -351,11 +358,279 @@ function parseTracker() {
   for (const line of readFileSync(p, 'utf8').split('\n')) {
     const m = line.match(/^\|\s*(\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|?([^|]*)\|?\s*$/);
     if (!m) continue;
+    const rawUrl = (m[10] || '').trim();
+    const md = rawUrl.match(/\((https?:\/\/[^)\s]+)\)/);
     rows.push({ num: Number(m[1]), date: m[2].trim(), company: m[3].trim(), role: m[4].trim(),
       score: m[5].trim(), status: m[6].trim(), pdf: m[7].trim(), report: m[8].trim(),
-      notes: m[9].trim(), url: (m[10] || '').trim() });
+      notes: m[9].trim(), url: md ? md[1] : rawUrl });
   }
   return rows;
+}
+
+function readDecisions() {
+  if (!existsSync(DECISIONS_PATH)) return { decisions: [] };
+  try {
+    const j = JSON.parse(readFileSync(DECISIONS_PATH, 'utf8'));
+    return { decisions: Array.isArray(j.decisions) ? j.decisions : [] };
+  } catch {
+    return { decisions: [] };
+  }
+}
+function writeDecisions(doc) {
+  mkdirSync(dirname(DECISIONS_PATH), { recursive: true });
+  writeFileSync(DECISIONS_PATH, JSON.stringify(doc, null, 2) + '\n');
+}
+function upsertDecision(entry) {
+  const doc = readDecisions();
+  const key = String(entry.url || `${entry.company}|${entry.title}`).toLowerCase();
+  const i = doc.decisions.findIndex(d => String(d.url || `${d.company}|${d.title}`).toLowerCase() === key);
+  if (i >= 0) doc.decisions[i] = { ...doc.decisions[i], ...entry };
+  else doc.decisions.push(entry);
+  writeDecisions(doc);
+  return entry;
+}
+function decisionMap() {
+  const map = new Map();
+  for (const d of readDecisions().decisions) {
+    if (d.url) map.set(String(d.url).toLowerCase(), d);
+    map.set(`${normCo(d.company)}|${String(d.title || '').toLowerCase()}`, d);
+  }
+  return map;
+}
+function runNodeCli(args, timeoutMs = 60000) {
+  return new Promise((resolveOut) => {
+    execFile('node', args, {
+      cwd: ROOT, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env },
+    }, (err, stdout, stderr) => resolveOut({
+      code: err ? (typeof err.code === 'number' ? err.code : 1) : 0,
+      stdout: stdout || '', stderr: stderr || '',
+    }));
+  });
+}
+function findTrackerRow({ url, company, title }) {
+  const rows = parseTracker() || [];
+  const u = String(url || '').trim().toLowerCase();
+  if (u) {
+    const byUrl = rows.find(r => String(r.url || '').toLowerCase() === u);
+    if (byUrl) return byUrl;
+  }
+  const co = normCo(company);
+  const role = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return rows.find(r => normCo(r.company) === co && String(r.role || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() === role) || null;
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function slugify(s) {
+  return String(s || 'company').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company';
+}
+async function markApplied({ company, title, url, note }) {
+  const existing = findTrackerRow({ url, company, title });
+  let trackerNum = existing ? existing.num : null;
+  if (existing) {
+    if (existing.status !== 'Applied') {
+      const out = await runNodeCli(['set-status.mjs', '--row', String(existing.num), 'Applied', '--json',
+        '--note', note || `Applied via MatchScan ${todayISO()}`], 30000);
+      if (out.code !== 0) {
+        let err = 'set-status failed';
+        try { err = JSON.parse(out.stdout.slice(out.stdout.indexOf('{'))).error || err; } catch { /* */ }
+        return { ok: false, error: err };
+      }
+    }
+  } else {
+    const rows = parseTracker() || [];
+    trackerNum = Math.max(0, ...rows.map(r => r.num || 0)) + 1;
+    const dir = join(ROOT, 'batch/tracker-additions');
+    mkdirSync(dir, { recursive: true });
+    const tsvPath = join(dir, `${String(trackerNum).padStart(3, '0')}-${slugify(company)}.tsv`);
+    const safeNote = (note || `Applied via MatchScan ${todayISO()}`).replace(/\t/g, ' ').replace(/\n/g, ' ');
+    const tsv = [
+      'num\tdate\tcompany\trole\tstatus\tscore\tpdf\treport\tnotes\turl',
+      `${trackerNum}\t${todayISO()}\t${company}\t${title}\tApplied\tN/A\t❌\t—\t${safeNote}\t${url || ''}`,
+      '',
+    ].join('\n');
+    writeFileSync(tsvPath, tsv);
+    const merge = await runNodeCli(['merge-tracker.mjs'], 60000);
+    if (merge.code !== 0) {
+      return { ok: false, error: (merge.stderr || merge.stdout || 'merge-tracker failed').slice(-300) };
+    }
+  }
+  const decision = upsertDecision({
+    action: 'applied', company, title, url: url || '', trackerNum,
+    at: new Date().toISOString(), note: note || '',
+  });
+  const pack = await buildOutreachPack({ num: trackerNum, company, role: title, url });
+  return { ok: true, trackerNum, decision, outreach: pack, rows: parseTracker() };
+}
+async function markDeclined({ company, title, url, note }) {
+  const existing = findTrackerRow({ url, company, title });
+  if (existing && !['Rejected', 'Discarded', 'SKIP', 'Hired'].includes(existing.status)) {
+    const out = await runNodeCli(['set-status.mjs', '--row', String(existing.num), 'SKIP', '--json',
+      '--note', note || `Declined via MatchScan ${todayISO()}`], 30000);
+    if (out.code !== 0) {
+      let err = 'set-status failed';
+      try { err = JSON.parse(out.stdout.slice(out.stdout.indexOf('{'))).error || err; } catch { /* */ }
+      return { ok: false, error: err };
+    }
+  }
+  const decision = upsertDecision({
+    action: 'declined', company, title, url: url || '',
+    trackerNum: existing ? existing.num : null,
+    at: new Date().toISOString(), note: note || '',
+  });
+  return { ok: true, decision, rows: parseTracker() };
+}
+function proofSnippet() {
+  try {
+    const y = readFileSync(join(ROOT, 'config/profile.yml'), 'utf8');
+    const m = y.match(/hero_metric:\s*"([^"]+)"/);
+    if (m) return m[1].replace(/[—–‐‑‒−-]/g, ' ').replace(/\s+/g, ' ').trim();
+  } catch { /* */ }
+  return 'Migrated 10+ automation workflows from Jenkins, XLR, and Ansible AWX to GitHub Actions';
+}
+function cleanMsg(s) {
+  return String(s || '')
+    .replace(/[—–‐‑‒−]/g, ', ')
+    .replace(/(?<=\w)-(?=\w)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function linkedInPeopleSearch(keywords) {
+  return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
+}
+async function lookupWarmContacts(company) {
+  const warm = [];
+  const lookup = await runNodeCli(['contact-lookup.mjs', '--company', company], 20000);
+  if (lookup.code === 0) {
+    try {
+      const j = JSON.parse(lookup.stdout.slice(lookup.stdout.indexOf('{')));
+      for (const c of (j.contacts || j.matches || [])) {
+        warm.push({
+          name: c.name || c.full_name || 'Saved contact',
+          title: c.title || c.role || 'Prior contact',
+          type: 'Internal Referral',
+          source: 'contacts.tsv',
+          linkedinUrl: c.linkedin || c.url || null,
+        });
+      }
+    } catch { /* */ }
+  }
+  if (existsSync(join(ROOT, 'data/Connections.csv'))) {
+    const joinOut = await runNodeCli(['linkedin-join.mjs', '--company', company], 20000);
+    try {
+      const text = joinOut.stdout;
+      const start = text.indexOf('{') >= 0 ? text.indexOf('{') : text.indexOf('[');
+      if (start >= 0) {
+        const j = JSON.parse(text.slice(start));
+        const rows = Array.isArray(j) ? j : (j.matches || j.connections || j.companies || []);
+        const list = Array.isArray(rows) ? rows : [];
+        for (const c of list.slice(0, 5)) {
+          const name = c.name || c.full_name || [c.first_name, c.last_name].filter(Boolean).join(' ');
+          if (!name) continue;
+          warm.push({
+            name,
+            title: c.position || c.title || 'LinkedIn connection',
+            type: 'Warm connection',
+            source: 'Connections.csv',
+            linkedinUrl: c.url || c.linkedin || null,
+          });
+        }
+      }
+    } catch { /* */ }
+  }
+  // de-dupe by name
+  const seen = new Set();
+  return warm.filter(w => {
+    const k = String(w.name).toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+function draftMessages({ type, company, role, name }) {
+  const proof = proofSnippet();
+  const who = name && name !== 'Find on LinkedIn' ? name.split(' ')[0] : 'there';
+  const roleShort = cleanMsg(role).slice(0, 60);
+  const co = cleanMsg(company);
+  if (type === 'Hiring Manager') {
+    return {
+      connection: cleanMsg(`Hi ${who}, I applied to the ${roleShort} role at ${co}. ${proof}. Would be glad to connect.`).slice(0, 200),
+      afterConnect: cleanMsg(`Thanks for connecting. Happy to share how I have shipped reusable GitHub Actions workflows and full stack tools if useful for the ${roleShort} search.`),
+    };
+  }
+  if (type === 'Recruiter') {
+    return {
+      connection: cleanMsg(`Hi ${who}, I applied for ${roleShort} at ${co}. Dec 2026 CS grad, Charlotte based, CI/CD and full stack internship experience. Happy to share my resume.`).slice(0, 200),
+      afterConnect: cleanMsg(`Thanks for connecting. I am targeting a Jan 2027 start. Glad to send a one page resume or answer screening questions for ${roleShort}.`),
+    };
+  }
+  // Peer / warm
+  return {
+    connection: cleanMsg(`Hi ${who}, I just applied to ${roleShort} at ${co} and have been doing CI/CD and full stack work in the same space. Would love to connect.`).slice(0, 200),
+    afterConnect: cleanMsg(`Thanks for connecting. Curious how your team approaches CI/CD and platform tooling day to day. I have been migrating bank pipelines to GitHub Actions this year.`),
+  };
+}
+async function buildOutreachPack({ num, company, role, url }) {
+  mkdirSync(OUTREACH_DIR, { recursive: true });
+  const warm = await lookupWarmContacts(company);
+  const slots = [];
+  const usedTypes = new Set();
+  for (const w of warm.slice(0, 3)) {
+    const msgs = draftMessages({ type: w.type.includes('Referral') || w.type.includes('Warm') ? 'Peer' : w.type, company, role, name: w.name });
+    slots.push({
+      ...w,
+      searchUrl: w.linkedinUrl || linkedInPeopleSearch(`${w.name} ${company}`),
+      messages: msgs,
+      named: true,
+    });
+    usedTypes.add(w.type);
+  }
+  const templates = [
+    { type: 'Hiring Manager', keywords: `${company} Engineering Manager OR "Hiring Manager" OR "Software Engineering Manager"` },
+    { type: 'Recruiter', keywords: `${company} Recruiter OR "Technical Recruiter" OR "Talent Acquisition" OR "University Recruiter"` },
+    { type: 'Peer', keywords: `${company} "Software Engineer" OR DevOps OR "Platform Engineer"` },
+  ];
+  for (const t of templates) {
+    if (slots.length >= 3) break;
+    if ([...usedTypes].some(u => u.toLowerCase().includes(t.type.toLowerCase().split(' ')[0]))) continue;
+    const msgs = draftMessages({ type: t.type, company, role, name: 'Find on LinkedIn' });
+    slots.push({
+      name: 'Find on LinkedIn',
+      title: t.type,
+      type: t.type,
+      source: 'linkedin-search',
+      named: false,
+      searchUrl: linkedInPeopleSearch(t.keywords),
+      messages: msgs,
+      howTo: `Open the LinkedIn search, pick one real ${t.type.toLowerCase()} at ${company}, then paste their first name into the drafts below before sending.`,
+    });
+  }
+  while (slots.length < 3) {
+    const t = templates[slots.length];
+    const msgs = draftMessages({ type: t.type, company, role, name: 'Find on LinkedIn' });
+    slots.push({
+      name: 'Find on LinkedIn', title: t.type, type: t.type, source: 'linkedin-search', named: false,
+      searchUrl: linkedInPeopleSearch(t.keywords), messages: msgs,
+      howTo: `Open the LinkedIn search, pick one real person, then personalize the draft.`,
+    });
+  }
+  const pack = {
+    trackerNum: num || null,
+    company,
+    role,
+    url: url || '',
+    generatedAt: new Date().toISOString(),
+    disclaimer: 'Names are only filled when found in your saved contacts or LinkedIn Connections export. Search links never invent people. Edit drafts before sending. Never auto send.',
+    people: slots.slice(0, 3),
+  };
+  if (num) writeFileSync(join(OUTREACH_DIR, `${num}.json`), JSON.stringify(pack, null, 2) + '\n');
+  return pack;
+}
+function readOutreachPack(num) {
+  const p = join(OUTREACH_DIR, `${Number(num)}.json`);
+  if (!existsSync(p)) return null;
+  try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; }
 }
 
 // ── Next steps — from data/apply-board.md (user board) ────────────────────────
@@ -425,9 +700,6 @@ const ENG_RE = /\b(software|devops|sre|platform|full.?stack|backend|frontend|fro
 const INTERN_RE = /\b(intern|internship|co-?op|summer)\b/i;
 let jobsRefreshState = { running: false, lastStarted: null, lastFinished: null, lastError: null, lastScanExit: null };
 
-function normCo(s) {
-  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 function enrichJob(j, appliedCos) {
   return {
     ...j,
@@ -467,6 +739,7 @@ function jobsFeed() {
   const dumpPath = join(ROOT, 'data/charlotte-fit-candidates.json');
   const tracker = parseTracker() || [];
   const appliedCos = new Set(tracker.map(r => normCo(r.company)));
+  const dmap = decisionMap();
   const rank = { 'apply-ready': 0, 'check-level': 1, 'new-scan': 2 };
   const fromDump = existsSync(dumpPath)
     ? (JSON.parse(readFileSync(dumpPath, 'utf8')).jobs || []).filter(j => j.bucket in rank)
@@ -475,7 +748,18 @@ function jobsFeed() {
   const fresh = recentScanJobs(3).filter(j => !dumpUrls.has(j.url));
   const dumpMeta = existsSync(dumpPath) ? JSON.parse(readFileSync(dumpPath, 'utf8')).summary : null;
   const jobs = [...fromDump, ...fresh]
-    .map(j => enrichJob(j, appliedCos))
+    .map(j => {
+      const enriched = enrichJob(j, appliedCos);
+      const d = dmap.get(String(j.url || '').toLowerCase())
+        || dmap.get(`${normCo(j.company)}|${String(j.title || '').toLowerCase()}`);
+      const tracked = findTrackerRow({ url: j.url, company: j.company, title: j.title });
+      return {
+        ...enriched,
+        decision: d ? d.action : (tracked && tracked.status === 'Applied' ? 'applied' : null),
+        trackerNum: (d && d.trackerNum) || (tracked && tracked.num) || null,
+      };
+    })
+    .filter(j => j.decision !== 'declined')
     .sort((a, b) => (rank[a.bucket] - rank[b.bucket]) || String(b.posted || '').localeCompare(String(a.posted || '')))
     .slice(0, 100);
   if (!jobs.length) return null;
@@ -989,6 +1273,78 @@ const server = http.createServer(async (req, res) => {
       }
       runPortalScanRefresh().catch(() => {});
       return json(res, 202, { ok: true, started: true, refresh: { ...jobsRefreshState } });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/jobs/decision') {
+      const body = JSON.parse(await readBody(req) || '{}');
+      const action = body.action === 'declined' ? 'declined' : body.action === 'applied' ? 'applied' : null;
+      const company = String(body.company || '').trim();
+      const title = String(body.title || body.role || '').trim();
+      const jobUrl = String(body.url || '').trim();
+      if (!action) return json(res, 400, { error: 'action must be applied or declined' });
+      if (!company || !title) return json(res, 400, { error: 'company and title required' });
+      if (action === 'applied') {
+        const result = await markApplied({ company, title, url: jobUrl, note: body.note });
+        if (!result.ok) return json(res, 400, result);
+        await store.addNotif({
+          kind: 'tracker',
+          title: `Marked Applied: ${company}`,
+          body: title,
+          key: `applied-${result.trackerNum}-${Date.now()}`,
+        });
+        return json(res, 200, { ...result, feed: jobsFeed() });
+      }
+      const result = await markDeclined({ company, title, url: jobUrl, note: body.note });
+      if (!result.ok) return json(res, 400, result);
+      await store.addNotif({
+        kind: 'jobs',
+        title: `Declined: ${company}`,
+        body: title,
+        key: `declined-${slugify(company)}-${Date.now()}`,
+      });
+      return json(res, 200, { ...result, feed: jobsFeed() });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/outreach') {
+      const num = Number(url.searchParams.get('num') || 0);
+      const company = String(url.searchParams.get('company') || '').trim();
+      if (num) {
+        let pack = readOutreachPack(num);
+        if (!pack) {
+          const row = (parseTracker() || []).find(r => r.num === num);
+          if (!row) return json(res, 404, { error: 'tracker row not found' });
+          pack = await buildOutreachPack({ num, company: row.company, role: row.role, url: row.url });
+        }
+        return json(res, 200, { pack });
+      }
+      if (company) {
+        const row = (parseTracker() || []).find(r => normCo(r.company) === normCo(company) && r.status === 'Applied')
+          || (parseTracker() || []).find(r => normCo(r.company) === normCo(company));
+        const pack = await buildOutreachPack({
+          num: row ? row.num : null,
+          company,
+          role: row ? row.role : String(url.searchParams.get('role') || 'Software Engineer'),
+          url: row ? row.url : '',
+        });
+        return json(res, 200, { pack });
+      }
+      // list applied rows + whether outreach pack exists
+      const rows = (parseTracker() || []).filter(r => ['Applied', 'Responded', 'Interview', 'Offer'].includes(r.status));
+      return json(res, 200, {
+        applications: rows.map(r => ({
+          ...r,
+          hasOutreach: existsSync(join(OUTREACH_DIR, `${r.num}.json`)),
+        })),
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/outreach/generate') {
+      const body = JSON.parse(await readBody(req) || '{}');
+      const num = Number(body.num || 0);
+      const row = num ? (parseTracker() || []).find(r => r.num === num) : null;
+      const company = String(body.company || (row && row.company) || '').trim();
+      const role = String(body.role || body.title || (row && row.role) || '').trim();
+      const jobUrl = String(body.url || (row && row.url) || '').trim();
+      if (!company || !role) return json(res, 400, { error: 'company and role required (or tracker num)' });
+      const pack = await buildOutreachPack({ num: num || (row && row.num) || null, company, role, url: jobUrl });
+      return json(res, 200, { pack });
     }
     if (req.method === 'POST' && url.pathname === '/api/job-jd') {
       const { jdUrl } = JSON.parse(await readBody(req) || '{}');

@@ -165,6 +165,29 @@
   .pill.apply { background:var(--green-soft); border-color:var(--green-mid); }
   .pill.check { background:#fff6e8; border-color:#f0c987; }
   .pill.fresh { background:var(--green-soft); border-color:var(--green-mid); }
+  .pill.done { background:#e8eef8; border-color:#9db4d8; }
+  button.danger {
+    background:#fff; color:#b42318; border:1px solid #f0a8a8; border-radius:var(--radius-sm);
+    padding:5px 11px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  button.danger:hover { background:#fdeeee; }
+  .job-actions { display:flex; gap:8px; margin-top:6px; align-items:center; flex-wrap:wrap; }
+  .outreach-card {
+    background:var(--panel2); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:12px;
+  }
+  .outreach-card h3 { margin:0 0 4px; font-size:18px; }
+  .msg-box {
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:10px 12px; font-size:13.5px; margin:6px 0 8px; white-space:pre-wrap;
+  }
+  .app-list button.rowbtn {
+    display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line);
+    border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; cursor:pointer;
+  }
+  .app-list button.rowbtn:hover, .app-list button.rowbtn.active {
+    border-color:var(--green-mid); background:var(--green-soft);
+  }
   .fchip { padding:5px 12px; border-radius:var(--radius-sm); border:1px solid var(--line); background:#fff; color:var(--text); cursor:pointer; font-size:12.5px; font-weight:600; }
   .fchip.active { border-color:var(--green); color:var(--green-deep); background:var(--green-soft); }
   a { color:var(--green-deep); }
@@ -227,6 +250,7 @@
   <button class="tbtn" id="notifBtn" type="button">Alerts<span class="badge" id="notifBadge" style="display:none">0</span></button>
   <button class="tbtn" id="jobsBtn" type="button">Find Jobs</button>
   <button class="tbtn" id="trackerBtn" type="button">Job Tracker</button>
+  <button class="tbtn" id="outreachBtn" type="button">Outreach</button>
   <button class="tbtn" id="historyBtn" type="button">Scan History</button>
   <button class="tbtn" id="libraryBtn" type="button">Resume Manager</button>
   <p class="note" style="margin:14px 10px 0;font-size:12px" id="storeInfo"></p>
@@ -237,6 +261,7 @@
     <button class="tbtn" type="button" onclick="document.getElementById('dashBtn').click()">Scan</button>
     <button class="tbtn" type="button" onclick="document.getElementById('jobsBtn').click()">Jobs</button>
     <button class="tbtn" type="button" onclick="document.getElementById('trackerBtn').click()">Tracker</button>
+    <button class="tbtn" type="button" onclick="document.getElementById('outreachBtn').click()">Outreach</button>
     <button class="tbtn" type="button" onclick="document.getElementById('historyBtn').click()">History</button>
     <button class="tbtn" type="button" onclick="document.getElementById('libraryBtn').click()">Library</button>
   </div>
@@ -285,8 +310,27 @@
 
   <div class="card" id="trackerPanel" style="display:none">
     <h2>Job Tracker <span class="note" id="trackerStatus"></span></h2>
-    <p class="note">Drag cards between columns to update status. Writes go through set-status.mjs.</p>
+    <p class="note">Drag cards between columns to update status. Applied cards also have Outreach for LinkedIn targets.</p>
     <div class="kanban" id="kanban"></div>
+  </div>
+
+  <div class="card" id="outreachPanel" style="display:none">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+      <div>
+        <h2 style="margin:0">Outreach</h2>
+        <p class="note" id="outreachMeta" style="margin:4px 0 0">3 LinkedIn targets + drafts per applied job. Names only when already in your contacts.</p>
+      </div>
+      <button class="mini" type="button" id="outreachRefreshBtn">Refresh list</button>
+    </div>
+    <div class="lib-layout" style="margin-top:12px">
+      <div class="lib-sidebar">
+        <p class="note" style="margin:0 0 8px">Applied / active</p>
+        <div class="app-list" id="outreachAppList"><span class="note">Loading…</span></div>
+      </div>
+      <div>
+        <div id="outreachDetail"><span class="note">Pick an applied job to see who to contact and what to say.</span></div>
+      </div>
+    </div>
   </div>
 
   <div class="card" id="jobsPanel" style="display:none">
@@ -703,8 +747,11 @@ function renderKanban() {
     div.className = 'kcol'; div.dataset.status = col;
     div.innerHTML = `<h3>${col} · ${rows.length}</h3>` + (rows.map(r =>
       `<div class="kcard" draggable="true" data-num="${r.num}">
-         <div class="co">#${r.num} ${r.company}</div><div class="ro">${r.role}</div>
-         <div class="meta">${r.date} · ${r.score || ''}</div></div>`).join('') || '<div class="note">—</div>');
+         <div class="co">#${r.num} ${esc(r.company)}</div><div class="ro">${esc(r.role)}</div>
+         <div class="meta">${esc(r.date)} · ${esc(r.score || '')}</div>
+         ${['Applied','Responded','Interview','Offer'].includes(col)
+           ? `<button class="mini" type="button" data-outreach="${r.num}" style="margin-top:6px">Outreach</button>`
+           : ''}</div>`).join('') || '<div class="note">—</div>');
     div.addEventListener('dragover', e => { e.preventDefault(); div.classList.add('dragover'); });
     div.addEventListener('dragleave', () => div.classList.remove('dragover'));
     div.addEventListener('drop', async e => {
@@ -726,6 +773,12 @@ function renderKanban() {
   }
   for (const card of kb.querySelectorAll('.kcard')) {
     card.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', card.dataset.num));
+  }
+  for (const btn of kb.querySelectorAll('[data-outreach]')) {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openOutreach(Number(btn.dataset.outreach));
+    });
   }
 }
 async function refreshTracker() {
@@ -749,19 +802,70 @@ function renderJobs() {
   const bucketLabel = { 'apply-ready': 'Apply-ready', 'check-level': 'Check level', 'new-scan': 'New from scan' };
   const bucketClass = { 'apply-ready': 'apply', 'check-level': 'check', 'new-scan': 'fresh' };
   grid.innerHTML = list.map((j, i) =>
-    `<div class="jcard">
-       <div><span class="co">${j.company}</span> <span class="pill ${bucketClass[j.bucket] || 'check'}">${bucketLabel[j.bucket] || j.bucket}</span>
-       ${j.appliedCompany ? '<span class="pill">already applied there</span>' : ''}</div>
-       <div>${j.title}</div>
-       <div class="note">${j.location || ''} · posted ${j.posted || 'n/a'} · applicants: ${j.applicants || 'unknown'}</div>
-       ${j.note ? `<div class="note">${j.note}</div>` : ''}
-       <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
-         <a href="${j.url}" target="_blank" rel="noopener">Posting ↗</a>
+    `<div class="jcard" data-job-i="${i}">
+       <div><span class="co">${esc(j.company)}</span> <span class="pill ${bucketClass[j.bucket] || 'check'}">${bucketLabel[j.bucket] || j.bucket}</span>
+       ${j.decision === 'applied' || j.trackerNum ? '<span class="pill done">Applied</span>' : ''}
+       ${j.appliedCompany && j.decision !== 'applied' ? '<span class="pill">already applied there</span>' : ''}</div>
+       <div>${esc(j.title)}</div>
+       <div class="note">${esc(j.location || '')} · posted ${esc(j.posted || 'n/a')} · applicants: ${esc(j.applicants || 'unknown')}</div>
+       ${j.note ? `<div class="note">${esc(j.note)}</div>` : ''}
+       <div class="job-actions">
+         <a href="${esc(j.url)}" target="_blank" rel="noopener">Posting ↗</a>
          <button class="mini" data-loadjd="${i}">Load JD &amp; scan</button>
          <button class="mini" data-scorejd="${i}">Score vs my CV</button>
+         ${j.decision === 'applied' || j.trackerNum
+           ? `<button class="primary" type="button" data-open-outreach="${j.trackerNum || ''}" data-co="${esc(j.company)}" data-role="${esc(j.title)}" style="padding:6px 12px;font-size:16px">Outreach</button>`
+           : `<button class="primary" type="button" data-mark-applied="${i}" style="padding:6px 12px;font-size:16px">Applied</button>
+              <button class="danger" type="button" data-mark-declined="${i}">Decline</button>`}
          <span class="note" data-scoreout="${i}"></span>
+         <span class="note" data-decisionout="${i}"></span>
        </div>
      </div>`).join('') || '<span class="note">Nothing in this filter right now.</span>';
+  for (const btn of grid.querySelectorAll('[data-mark-applied], [data-mark-declined]')) {
+    btn.addEventListener('click', async () => {
+      const applied = btn.hasAttribute('data-mark-applied');
+      const i = Number(btn.dataset.markApplied || btn.dataset.markDeclined);
+      const job = list[i];
+      const out = grid.querySelector(`[data-decisionout="${i}"]`);
+      if (!confirm(applied
+        ? `Mark Applied for ${job.company} — ${job.title}? Only click after you submitted (or are logging a real apply).`
+        : `Decline ${job.company} — ${job.title}? It will leave this list.`)) return;
+      btn.disabled = true;
+      out.textContent = applied ? 'saving Applied…' : 'declining…';
+      try {
+        const r = await api('/api/jobs/decision', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: applied ? 'applied' : 'declined',
+            company: job.company, title: job.title, url: job.url,
+          }),
+        });
+        const j = await r.json();
+        if (j.error) { out.innerHTML = `<span class="err">${esc(j.error)}</span>`; return; }
+        if (j.feed && j.feed.jobs) feedJobs = j.feed.jobs;
+        else await refreshJobs();
+        renderJobs();
+        refreshTracker();
+        refreshNotifs();
+        if (applied && j.trackerNum) {
+          if (confirm(`Logged as tracker #${j.trackerNum}. Open Outreach for 3 LinkedIn targets?`)) {
+            openOutreach(j.trackerNum);
+          }
+        }
+      } catch {
+        out.innerHTML = '<span class="err">decision failed</span>';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+  for (const btn of grid.querySelectorAll('[data-open-outreach]')) {
+    btn.addEventListener('click', () => {
+      const num = Number(btn.dataset.openOutreach || 0);
+      if (num) openOutreach(num);
+      else openOutreachCompany(btn.dataset.co, btn.dataset.role);
+    });
+  }
   for (const btn of grid.querySelectorAll('[data-loadjd]')) {
     btn.addEventListener('click', async () => {
       const job = list[Number(btn.dataset.loadjd)];
@@ -872,9 +976,9 @@ for (const chip of document.querySelectorAll('[data-libf]')) {
 $('libRefreshBtn').addEventListener('click', () => refreshLibrary());
 $('libUseScanBtn').addEventListener('click', () => useLibInScan(false));
 $('libScanNowBtn').addEventListener('click', () => useLibInScan(true));
-for (const chip of document.querySelectorAll('.fchip')) {
+for (const chip of document.querySelectorAll('#jobsPanel .fchip')) {
   chip.addEventListener('click', () => {
-    document.querySelectorAll('.fchip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('#jobsPanel .fchip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     feedFilter = chip.dataset.f;
     renderJobs();
@@ -1067,7 +1171,132 @@ $('loginBtn').addEventListener('click', async () => {
 });
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
 const TABS = [['notifBtn', 'notifPanel', null], ['trackerBtn', 'trackerPanel', refreshTracker],
+  ['outreachBtn', 'outreachPanel', refreshOutreachList],
   ['jobsBtn', 'jobsPanel', refreshJobs], ['historyBtn', 'historyPanel', refreshHistory], ['libraryBtn', 'libraryPanel', refreshLibrary]];
+let outreachSelected = null;
+function openOutreach(num) {
+  outreachSelected = Number(num);
+  for (const [b2, p2] of TABS) { $(p2).style.display = 'none'; $(b2).classList.remove('active'); }
+  setHomeVisible(false);
+  $('outreachPanel').style.display = 'block';
+  $('outreachBtn').classList.add('active');
+  refreshOutreachList().then(() => loadOutreachDetail(outreachSelected));
+}
+function openOutreachCompany(company, role) {
+  for (const [b2, p2] of TABS) { $(p2).style.display = 'none'; $(b2).classList.remove('active'); }
+  setHomeVisible(false);
+  $('outreachPanel').style.display = 'block';
+  $('outreachBtn').classList.add('active');
+  $('outreachDetail').innerHTML = '<span class="note">Building outreach pack…</span>';
+  api('/api/outreach/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company, role }),
+  }).then(r => r.json()).then(j => {
+    if (j.error) { $('outreachDetail').innerHTML = `<span class="err">${esc(j.error)}</span>`; return; }
+    renderOutreachDetail(j.pack);
+    refreshOutreachList();
+  }).catch(() => { $('outreachDetail').innerHTML = '<span class="err">Could not build outreach.</span>'; });
+}
+function renderOutreachDetail(pack) {
+  if (!pack) {
+    $('outreachDetail').innerHTML = '<span class="note">No pack yet.</span>';
+    return;
+  }
+  outreachSelected = pack.trackerNum;
+  $('outreachMeta').textContent = `${pack.company} · ${pack.role}` + (pack.trackerNum ? ` · #${pack.trackerNum}` : '');
+  const people = (pack.people || []).map((p, idx) => {
+    const copyId = `msg-${idx}`;
+    return `<div class="outreach-card">
+      <h3>${idx + 1}. ${esc(p.type)}${p.named ? `: ${esc(p.name)}` : ''}</h3>
+      <p class="note" style="margin:0 0 8px">${esc(p.title || '')}${p.source ? ` · from ${esc(p.source)}` : ''}</p>
+      ${p.howTo ? `<p class="note">${esc(p.howTo)}</p>` : ''}
+      <div class="job-actions" style="margin-bottom:8px">
+        <a class="primary" style="display:inline-block;padding:8px 14px;text-decoration:none;font-size:16px" href="${esc(p.searchUrl)}" target="_blank" rel="noopener">Open LinkedIn search ↗</a>
+        ${p.linkedinUrl ? `<a class="mini" href="${esc(p.linkedinUrl)}" target="_blank" rel="noopener">Saved profile ↗</a>` : ''}
+      </div>
+      <div class="note">Connection request (≤200 chars)</div>
+      <div class="msg-box" id="${copyId}-c">${esc(p.messages && p.messages.connection)}</div>
+      <button class="mini" type="button" data-copy="${copyId}-c">Copy connection note</button>
+      <div class="note" style="margin-top:10px">After they accept</div>
+      <div class="msg-box" id="${copyId}-a">${esc(p.messages && p.messages.afterConnect)}</div>
+      <button class="mini" type="button" data-copy="${copyId}-a">Copy follow up</button>
+    </div>`;
+  }).join('');
+  $('outreachDetail').innerHTML = `
+    <p class="note" style="margin:0 0 12px">${esc(pack.disclaimer || '')}</p>
+    ${pack.url ? `<p style="margin:0 0 12px"><a href="${esc(pack.url)}" target="_blank" rel="noopener">Job posting ↗</a></p>` : ''}
+    ${people}
+    <button class="mini" type="button" id="outreachRegenBtn">Regenerate drafts</button>
+    <span class="note" id="outreachRegenStatus"></span>`;
+  for (const btn of $('outreachDetail').querySelectorAll('[data-copy]')) {
+    btn.addEventListener('click', async () => {
+      const el = $(btn.dataset.copy);
+      try {
+        await navigator.clipboard.writeText(el.textContent);
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = btn.dataset.copy.endsWith('-c') ? 'Copy connection note' : 'Copy follow up'; }, 1200);
+      } catch { btn.textContent = 'Copy failed'; }
+    });
+  }
+  const regen = $('outreachRegenBtn');
+  if (regen) {
+    regen.addEventListener('click', async () => {
+      $('outreachRegenStatus').textContent = 'Regenerating…';
+      try {
+        const r = await api('/api/outreach/generate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            num: pack.trackerNum, company: pack.company, role: pack.role, url: pack.url,
+          }),
+        });
+        const j = await r.json();
+        if (j.error) { $('outreachRegenStatus').innerHTML = `<span class="err">${esc(j.error)}</span>`; return; }
+        renderOutreachDetail(j.pack);
+      } catch {
+        $('outreachRegenStatus').innerHTML = '<span class="err">failed</span>';
+      }
+    });
+  }
+}
+async function loadOutreachDetail(num) {
+  $('outreachDetail').innerHTML = '<span class="note">Loading outreach…</span>';
+  try {
+    const r = await api(`/api/outreach?num=${Number(num)}`);
+    const j = await r.json();
+    if (j.error) { $('outreachDetail').innerHTML = `<span class="err">${esc(j.error)}</span>`; return; }
+    renderOutreachDetail(j.pack);
+  } catch {
+    $('outreachDetail').innerHTML = '<span class="err">Could not load outreach.</span>';
+  }
+}
+async function refreshOutreachList() {
+  const list = $('outreachAppList');
+  if (!list) return;
+  try {
+    const r = await api('/api/outreach');
+    const j = await r.json();
+    const apps = j.applications || [];
+    if (!apps.length) {
+      list.innerHTML = '<span class="note">No active applied jobs yet. Mark Applied on Find Jobs first.</span>';
+      return;
+    }
+    list.innerHTML = apps.map(a =>
+      `<button class="rowbtn${outreachSelected === a.num ? ' active' : ''}" type="button" data-onum="${a.num}">
+         <strong>#${a.num} ${esc(a.company)}</strong><br>
+         <span class="note">${esc(a.role)}</span>
+       </button>`).join('');
+    for (const btn of list.querySelectorAll('[data-onum]')) {
+      btn.addEventListener('click', () => {
+        outreachSelected = Number(btn.dataset.onum);
+        refreshOutreachList();
+        loadOutreachDetail(outreachSelected);
+      });
+    }
+  } catch {
+    list.innerHTML = '<span class="note">Outreach list unavailable.</span>';
+  }
+}
+$('outreachRefreshBtn')?.addEventListener('click', () => refreshOutreachList());
 function setHomeVisible(on) {
   $('welcomeBlock').style.display = on ? 'block' : 'none';
   $('nextStepsCard').style.display = on ? 'block' : 'none';
@@ -1114,23 +1343,94 @@ async function refreshNextSteps() {
     }
     if (j.applyNow && j.applyNow.length) {
       parts.push('<h3 style="margin:0 0 8px;font-size:18px">Apply now</h3><ul style="margin:0 0 14px;padding-left:18px">');
-      for (const a of j.applyNow) {
+      j.applyNow.forEach((a, i) => {
         const link = a.url ? ` <a href="${esc(a.url)}" target="_blank" rel="noopener">Open JD</a>` : '';
-        parts.push(`<li style="margin-bottom:10px"><strong>${esc(a.title)}</strong>${link}${a.blurb ? `<div class="note" style="margin-top:4px">${esc(a.blurb)}</div>` : ''}</li>`);
-      }
+        parts.push(`<li style="margin-bottom:12px" data-ns-apply="${i}"><strong>${esc(a.title)}</strong>${link}
+          ${a.blurb ? `<div class="note" style="margin-top:4px">${esc(a.blurb)}</div>` : ''}
+          <div class="job-actions">
+            <button class="primary" type="button" data-ns-mark="applied" data-ns-i="${i}" style="padding:6px 12px;font-size:16px">Applied</button>
+            <button class="danger" type="button" data-ns-mark="declined" data-ns-i="${i}">Decline</button>
+            <span class="note" data-ns-out="${i}"></span>
+          </div>
+        </li>`);
+      });
       parts.push('</ul>');
+      body._nsApply = j.applyNow;
     }
     if (j.checks && j.checks.length) {
       parts.push('<h3 style="margin:0 0 8px;font-size:18px">Check first</h3><ul style="margin:0;padding-left:18px">');
-      for (const c of j.checks.slice(0, 5)) {
+      j.checks.slice(0, 5).forEach((c, i) => {
         const link = c.url ? ` <a href="${esc(c.url)}" target="_blank" rel="noopener">Link</a>` : '';
-        parts.push(`<li style="margin-bottom:8px"><strong>${esc(c.id)} · ${esc(c.company)}</strong> — ${esc(c.role)}${link}<div class="note" style="margin-top:4px">${esc(c.note)}</div></li>`);
-      }
+        parts.push(`<li style="margin-bottom:10px"><strong>${esc(c.id)} · ${esc(c.company)}</strong> — ${esc(c.role)}${link}
+          <div class="note" style="margin-top:4px">${esc(c.note)}</div>
+          <div class="job-actions">
+            <button class="primary" type="button" data-ns-check="applied" data-ns-ci="${i}" style="padding:6px 12px;font-size:16px">Applied</button>
+            <button class="danger" type="button" data-ns-check="declined" data-ns-ci="${i}">Decline</button>
+            <span class="note" data-ns-cout="${i}"></span>
+          </div>
+        </li>`);
+      });
       parts.push('</ul>');
+      body._nsChecks = j.checks.slice(0, 5);
     }
     body.innerHTML = parts.join('') || '<span class="note">Board loaded, but no open actions parsed.</span>';
+    // reattach lists after innerHTML wipe
+    if (j.applyNow) body._nsApply = j.applyNow;
+    if (j.checks) body._nsChecks = j.checks.slice(0, 5);
+    for (const b of body.querySelectorAll('[data-ns-mark]')) {
+      b.addEventListener('click', async () => {
+        const item = body._nsApply[Number(b.dataset.nsI)];
+        if (!item) return;
+        const title = item.title || '';
+        const company = (title.split(/—| - | · /)[0] || title).trim();
+        const role = title.replace(company, '').replace(/^[\s—–\-·]+/, '').trim() || title;
+        const out = body.querySelector(`[data-ns-out="${b.dataset.nsI}"]`);
+        await decideFromUi({
+          action: b.dataset.nsMark, company, title: role || title, url: item.url || '',
+          outEl: out, btn: b,
+        });
+      });
+    }
+    for (const b of body.querySelectorAll('[data-ns-check]')) {
+      b.addEventListener('click', async () => {
+        const item = body._nsChecks[Number(b.dataset.nsCi)];
+        if (!item) return;
+        const out = body.querySelector(`[data-ns-cout="${b.dataset.nsCi}"]`);
+        await decideFromUi({
+          action: b.dataset.nsCheck, company: item.company, title: item.role, url: item.url || '',
+          outEl: out, btn: b,
+        });
+      });
+    }
   } catch {
     body.innerHTML = '<span class="err">Could not load next steps.</span>';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+async function decideFromUi({ action, company, title, url, outEl, btn }) {
+  if (!confirm(action === 'applied'
+    ? `Mark Applied for ${company} — ${title}?`
+    : `Decline ${company} — ${title}?`)) return;
+  if (btn) btn.disabled = true;
+  if (outEl) outEl.textContent = action === 'applied' ? 'saving…' : 'declining…';
+  try {
+    const r = await api('/api/jobs/decision', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, company: String(company).replace(/\*\*/g, ''), title, url }),
+    });
+    const j = await r.json();
+    if (j.error) {
+      if (outEl) outEl.innerHTML = `<span class="err">${esc(j.error)}</span>`;
+      return;
+    }
+    if (outEl) outEl.textContent = action === 'applied' ? `Applied #${j.trackerNum}` : 'Declined';
+    refreshJobs(); refreshTracker(); refreshNotifs(); refreshNextSteps();
+    if (action === 'applied' && j.trackerNum && confirm(`Open Outreach for #${j.trackerNum}?`)) {
+      openOutreach(j.trackerNum);
+    }
+  } catch {
+    if (outEl) outEl.innerHTML = '<span class="err">failed</span>';
   } finally {
     if (btn) btn.disabled = false;
   }
